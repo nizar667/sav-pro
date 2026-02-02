@@ -1,0 +1,57 @@
+Je veux créer une application mobile de service après-vente avec React Native (Expo) et Node.js/Express. L'application aura deux types d'utilisateurs : commerciaux et techniciens.
+
+Le commercial peut déclarer un problème sur un produit en remplissant un formulaire avec :
+
+Sélection d'une catégorie
+
+Nom du produit, référence, numéro de série
+
+Photo du problème (optionnelle)
+
+Sélection du client
+
+Cette déclaration doit apparaître immédiatement chez les techniciens.
+
+Le technicien peut voir la liste des déclarations, prendre en charge une déclaration et la marquer comme réglée. Une fois réglée, le commercial est notifié.
+
+Je veux utiliser :
+
+Frontend : React Native (Expo) pour l'application mobile
+
+Backend : Node.js avec Express
+
+Base de données : SQLite (pour commencer) ou PostgreSQL (si disponible)
+
+Authentification : JWT (JSON Web Tokens)
+
+Stockage de photos : Stockage local du serveur (ou cloud si facile)
+
+Structure de base des données (tables) :
+
+Utilisateurs (id, email, mot de passe, nom, rôle)
+
+Clients (id, nom, email, téléphone, adresse, commercial_id)
+
+Catégories (id, nom)
+
+Déclarations (id, commercial_id, client_id, catégorie_id, nom_produit, référence, numéro_serie, description_problème, photo_url, statut, technicien_id, date_creation, date_prise_en_charge, date_résolution)
+
+Je veux que Replit m'aide à :
+
+Mettre en place le backend Express avec les routes d'authentification (inscription/connexion) et les routes pour les déclarations.
+
+Créer les modèles de base de données (en utilisant Sequelize ORM ou Knex, ou même raw SQL si plus simple).
+
+Mettre en place l'upload de photos (multer).
+
+Créer un frontend React Native (Expo) avec les écrans de connexion, d'inscription, et les tableaux de bord pour commerciaux et techniciens.
+
+Pour commencer, je veux un code de base qui fonctionne sur Replit avec :
+
+Le backend (Node.js) dans un dossier backend
+
+Le frontend (React Native Expo) dans un dossier frontend
+
+Je voudrais que le backend soit exposé sur un port (par exemple 3000) et le frontend sur un autre (par exemple 3001). Je veux aussi que Replit me guide pour lancer les deux serveurs.
+
+Remarque : Comme nous sommes sur Replit, je veux que le code soit prêt à être exécuté avec un bouton "Run". Il faudra peut-être configurer un fichier .replit pour lancer le backend et le frontend.
