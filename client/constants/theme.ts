@@ -1,30 +1,54 @@
 import { Platform } from "react-native";
 
-const tintColorLight = "#007AFF";
-const tintColorDark = "#0A84FF";
+export const AppColors = {
+  primary: "#E63946",
+  secondary: "#457B9D",
+  success: "#06D6A0",
+  warning: "#F77F00",
+  background: "#FAFAFA",
+  surface: "#FFFFFF",
+  textPrimary: "#1D1D1F",
+  textSecondary: "#6C757D",
+  border: "#E5E5E5",
+};
+
+const tintColorLight = AppColors.primary;
+const tintColorDark = "#FF6B6B";
 
 export const Colors = {
   light: {
-    text: "#11181C",
+    text: AppColors.textPrimary,
+    textSecondary: AppColors.textSecondary,
     buttonText: "#FFFFFF",
-    tabIconDefault: "#687076",
+    tabIconDefault: AppColors.textSecondary,
     tabIconSelected: tintColorLight,
-    link: "#007AFF",
-    backgroundRoot: "#FFFFFF", // Elevation 0
-    backgroundDefault: "#F2F2F2", // Elevation 1
-    backgroundSecondary: "#E6E6E6", // Elevation 2
-    backgroundTertiary: "#D9D9D9", // Elevation 3
+    link: AppColors.primary,
+    primary: AppColors.primary,
+    secondary: AppColors.secondary,
+    success: AppColors.success,
+    warning: AppColors.warning,
+    backgroundRoot: AppColors.background,
+    backgroundDefault: AppColors.surface,
+    backgroundSecondary: "#F2F2F7",
+    backgroundTertiary: "#E5E5EA",
+    border: AppColors.border,
   },
   dark: {
     text: "#ECEDEE",
+    textSecondary: "#9BA1A6",
     buttonText: "#FFFFFF",
     tabIconDefault: "#9BA1A6",
     tabIconSelected: tintColorDark,
-    link: "#0A84FF",
-    backgroundRoot: "#1F2123", // Elevation 0
-    backgroundDefault: "#2A2C2E", // Elevation 1
-    backgroundSecondary: "#353739", // Elevation 2
-    backgroundTertiary: "#404244", // Elevation 3
+    link: tintColorDark,
+    primary: "#FF6B6B",
+    secondary: "#6BA3C7",
+    success: "#2EE0A8",
+    warning: "#FF9F1C",
+    backgroundRoot: "#1C1C1E",
+    backgroundDefault: "#2C2C2E",
+    backgroundSecondary: "#3A3A3C",
+    backgroundTertiary: "#48484A",
+    border: "#3A3A3C",
   },
 };
 
@@ -54,6 +78,16 @@ export const BorderRadius = {
 };
 
 export const Typography = {
+  hero: {
+    fontSize: 34,
+    lineHeight: 42,
+    fontWeight: "700" as const,
+  },
+  title: {
+    fontSize: 28,
+    lineHeight: 36,
+    fontWeight: "700" as const,
+  },
   h1: {
     fontSize: 32,
     lineHeight: 40,
@@ -74,14 +108,29 @@ export const Typography = {
     lineHeight: 28,
     fontWeight: "600" as const,
   },
+  headline: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: "600" as const,
+  },
   body: {
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "400" as const,
   },
+  caption: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "400" as const,
+  },
   small: {
     fontSize: 14,
     lineHeight: 20,
+    fontWeight: "400" as const,
+  },
+  tiny: {
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: "400" as const,
   },
   link: {
@@ -91,15 +140,42 @@ export const Typography = {
   },
 };
 
+export const Shadows = {
+  small: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  medium: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  large: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  fab: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+};
+
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: "system-ui",
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: "ui-serif",
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: "ui-rounded",
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: "ui-monospace",
   },
   default: {

@@ -3,12 +3,15 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
-import HomeStackNavigator from "@/navigation/HomeStackNavigator";
+import DeclarationsStackNavigator from "@/navigation/DeclarationsStackNavigator";
+import ClientsStackNavigator from "@/navigation/ClientsStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type MainTabParamList = {
-  HomeTab: undefined;
+  DeclarationsTab: undefined;
+  ClientsTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -16,10 +19,13 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
+  const { user } = useAuth();
+
+  const isCommercial = user?.role === "commercial";
 
   return (
     <Tab.Navigator
-      initialRouteName="HomeTab"
+      initialRouteName="DeclarationsTab"
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
@@ -44,20 +50,32 @@ export default function MainTabNavigator() {
       }}
     >
       <Tab.Screen
-        name="HomeTab"
-        component={HomeStackNavigator}
+        name="DeclarationsTab"
+        component={DeclarationsStackNavigator}
         options={{
-          title: "Home",
+          title: "Déclarations",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="home" size={size} color={color} />
+            <Feather name="clipboard" size={size} color={color} />
           ),
         }}
       />
+      {isCommercial ? (
+        <Tab.Screen
+          name="ClientsTab"
+          component={ClientsStackNavigator}
+          options={{
+            title: "Clients",
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="users" size={size} color={color} />
+            ),
+          }}
+        />
+      ) : null}
       <Tab.Screen
         name="ProfileTab"
         component={ProfileStackNavigator}
         options={{
-          title: "Profile",
+          title: "Profil",
           tabBarIcon: ({ color, size }) => (
             <Feather name="user" size={size} color={color} />
           ),
