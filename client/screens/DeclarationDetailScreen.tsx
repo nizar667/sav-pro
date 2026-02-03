@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Image, Alert, ScrollView } from "react-native";
+import { View, StyleSheet, Image, Alert, ScrollView, Pressable, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
@@ -26,10 +26,15 @@ export default function DeclarationDetailScreen() {
 
   const [declaration, setDeclaration] = useState(route.params.declaration);
   const [isLoading, setIsLoading] = useState(false);
+  const [remarks, setRemarks] = useState(declaration.technician_remarks || "");
+  const [isEditingRemarks, setIsEditingRemarks] = useState(false);
+  const [isSavingRemarks, setIsSavingRemarks] = useState(false);
 
   const isTechnician = user?.role === "technicien";
+  const isCommercial = user?.role === "commercial";
   const canTakeCharge = isTechnician && declaration.status === "nouvelle";
   const canResolve = isTechnician && declaration.status === "en_cours" && declaration.technician_id === user?.id;
+  const canEditRemarks = isTechnician && declaration.technician_id === user?.id && declaration.status !== "reglee";
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
@@ -108,6 +113,41 @@ export default function DeclarationDetailScreen() {
       ]
     );
   };
+
+  const handleSaveRemarks = async () => {
+    setIsSavingRemarks(true);
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(
+        new URL(`/api/declarations/${declaration.id}/remarks`, baseUrl).href,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ technician_remarks: remarks }),
+        }
+      );
+
+      if (response.ok) {
+        const updatedDeclaration = await response.json();
+        setDeclaration(updatedDeclaration);
+        setIsEditingRemarks(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        throw new Error("Échec de la sauvegarde des remarques");
+      }
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Erreur", error.message);
+    } finally {
+      setIsSavingRemarks(false);
+    }
+  };
+
+  const accessories = declaration.accessories || [];
+  const hasAccessories = accessories.length > 0;
 
   return (
     <ScrollView
@@ -215,6 +255,33 @@ export default function DeclarationDetailScreen() {
         ) : null}
       </View>
 
+      {hasAccessories ? (
+        <View style={[styles.section, { backgroundColor: theme.backgroundDefault, ...Shadows.small }]}>
+          <ThemedText type="h4" style={styles.sectionTitle}>
+            Faux Client (Accessoires inclus)
+          </ThemedText>
+          <View style={styles.accessoriesList}>
+            {accessories.map((item) => (
+              <View key={item.id} style={styles.accessoryItem}>
+                <Feather
+                  name={item.checked ? "check-circle" : "circle"}
+                  size={18}
+                  color={item.checked ? theme.success : theme.textSecondary}
+                />
+                <ThemedText
+                  style={[
+                    styles.accessoryText,
+                    { color: item.checked ? theme.text : theme.textSecondary },
+                  ]}
+                >
+                  {item.name}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       <View style={[styles.section, { backgroundColor: theme.backgroundDefault, ...Shadows.small }]}>
         <ThemedText type="h4" style={styles.sectionTitle}>
           Client
@@ -237,6 +304,67 @@ export default function DeclarationDetailScreen() {
           {declaration.description || "Aucune description fournie"}
         </ThemedText>
       </View>
+
+      {(declaration.technician_remarks || canEditRemarks) ? (
+        <View style={[styles.section, { backgroundColor: theme.backgroundDefault, ...Shadows.small }]}>
+          <View style={styles.sectionHeader}>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Remarques du technicien
+            </ThemedText>
+            {canEditRemarks && !isEditingRemarks ? (
+              <Pressable onPress={() => setIsEditingRemarks(true)}>
+                <Feather name="edit-2" size={18} color={theme.primary} />
+              </Pressable>
+            ) : null}
+          </View>
+          
+          {isEditingRemarks ? (
+            <View>
+              <TextInput
+                style={[
+                  styles.remarksInput,
+                  {
+                    backgroundColor: theme.backgroundRoot,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
+                ]}
+                value={remarks}
+                onChangeText={setRemarks}
+                placeholder="Ajoutez vos remarques..."
+                placeholderTextColor={theme.textTertiary}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+              <View style={styles.remarksButtons}>
+                <Pressable
+                  style={[styles.remarksButton, { backgroundColor: theme.backgroundRoot }]}
+                  onPress={() => {
+                    setRemarks(declaration.technician_remarks || "");
+                    setIsEditingRemarks(false);
+                  }}
+                >
+                  <ThemedText style={{ color: theme.textSecondary }}>Annuler</ThemedText>
+                </Pressable>
+                <Pressable
+                  style={[styles.remarksButton, { backgroundColor: theme.primary }]}
+                  onPress={handleSaveRemarks}
+                  disabled={isSavingRemarks}
+                >
+                  <ThemedText style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    {isSavingRemarks ? "..." : "Enregistrer"}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <ThemedText style={styles.description}>
+              {declaration.technician_remarks || "Aucune remarque"}
+            </ThemedText>
+          )}
+        </View>
+      ) : null}
 
       <View style={[styles.section, { backgroundColor: theme.backgroundDefault, ...Shadows.small }]}>
         <ThemedText type="h4" style={styles.sectionTitle}>
@@ -323,6 +451,11 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.lg,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   sectionTitle: {
     marginBottom: Spacing.md,
   },
@@ -345,6 +478,36 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  accessoriesList: {
+    gap: Spacing.sm,
+  },
+  accessoryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  accessoryText: {
+    fontSize: 15,
+  },
+  remarksInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    fontSize: 15,
+    lineHeight: 22,
+    minHeight: 100,
+  },
+  remarksButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  remarksButton: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
   },
   timeline: {
     gap: Spacing.md,

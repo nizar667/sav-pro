@@ -7,6 +7,7 @@ import { HeaderButton } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
+import Checkbox from "expo-checkbox";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { ThemedText } from "@/components/ThemedText";
 import { Input } from "@/components/Input";
@@ -15,7 +16,7 @@ import { Picker } from "@/components/Picker";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { CATEGORIES, Client } from "@/types";
+import { CATEGORIES, Client, AccessoryItem, DEFAULT_ACCESSORIES } from "@/types";
 import { getApiUrl } from "@/lib/query-client";
 
 export default function NewDeclarationScreen() {
@@ -35,6 +36,15 @@ export default function NewDeclarationScreen() {
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const [accessories, setAccessories] = useState<AccessoryItem[]>(
+    DEFAULT_ACCESSORIES.map((name, index) => ({
+      id: String(index + 1),
+      name,
+      checked: false,
+    }))
+  );
+  const [customAccessory, setCustomAccessory] = useState("");
 
   useEffect(() => {
     fetchClients();
@@ -78,7 +88,7 @@ export default function NewDeclarationScreen() {
         </HeaderButton>
       ),
     });
-  }, [navigation, theme, isValid, isLoading, categoryId, productName, reference, serialNumber, clientId, description, photoUri]);
+  }, [navigation, theme, isValid, isLoading, categoryId, productName, reference, serialNumber, clientId, description, photoUri, accessories]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -136,6 +146,31 @@ export default function NewDeclarationScreen() {
     ]);
   };
 
+  const toggleAccessory = (id: string) => {
+    setAccessories((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, checked: !item.checked } : item
+      )
+    );
+  };
+
+  const addCustomAccessory = () => {
+    if (!customAccessory.trim()) return;
+    
+    const newAccessory: AccessoryItem = {
+      id: String(Date.now()),
+      name: customAccessory.trim(),
+      checked: true,
+    };
+    
+    setAccessories((prev) => [...prev, newAccessory]);
+    setCustomAccessory("");
+  };
+
+  const removeAccessory = (id: string) => {
+    setAccessories((prev) => prev.filter((item) => item.id !== id));
+  };
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
@@ -181,6 +216,8 @@ export default function NewDeclarationScreen() {
         }
       }
 
+      const checkedAccessories = accessories.filter((a) => a.checked);
+
       const response = await fetch(new URL("/api/declarations", baseUrl).href, {
         method: "POST",
         headers: {
@@ -195,6 +232,7 @@ export default function NewDeclarationScreen() {
           serial_number: serialNumber.trim(),
           description: description.trim(),
           photo_url: photoUrl,
+          accessories: checkedAccessories,
         }),
       });
 
@@ -277,6 +315,58 @@ export default function NewDeclarationScreen() {
         onChangeText={setDescription}
       />
 
+      <View style={styles.accessoriesSection}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          Faux Client (Accessoires inclus)
+        </ThemedText>
+        <ThemedText style={[styles.hint, { color: theme.textTertiary }]}>
+          Cochez les éléments fournis avec le produit
+        </ThemedText>
+        
+        <View style={[styles.accessoriesList, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          {accessories.map((item) => (
+            <View key={item.id} style={styles.accessoryRow}>
+              <Pressable
+                style={styles.checkboxRow}
+                onPress={() => toggleAccessory(item.id)}
+              >
+                <Checkbox
+                  value={item.checked}
+                  onValueChange={() => toggleAccessory(item.id)}
+                  color={item.checked ? theme.primary : undefined}
+                  style={styles.checkbox}
+                />
+                <ThemedText style={styles.accessoryText}>{item.name}</ThemedText>
+              </Pressable>
+              {!DEFAULT_ACCESSORIES.includes(item.name) ? (
+                <Pressable onPress={() => removeAccessory(item.id)} hitSlop={8}>
+                  <Feather name="x" size={18} color={theme.textSecondary} />
+                </Pressable>
+              ) : null}
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.addAccessoryRow}>
+          <View style={styles.addAccessoryInput}>
+            <Input
+              placeholder="Ajouter un autre élément..."
+              value={customAccessory}
+              onChangeText={setCustomAccessory}
+              onSubmitEditing={addCustomAccessory}
+              returnKeyType="done"
+            />
+          </View>
+          <Pressable
+            style={[styles.addButton, { backgroundColor: theme.primary }]}
+            onPress={addCustomAccessory}
+            disabled={!customAccessory.trim()}
+          >
+            <Feather name="plus" size={20} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </View>
+
       <View style={styles.photoSection}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
           Photo (optionnelle)
@@ -323,6 +413,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     marginBottom: Spacing.sm,
+  },
+  hint: {
+    fontSize: 12,
+    marginBottom: Spacing.md,
+  },
+  accessoriesSection: {
+    marginBottom: Spacing.lg,
+  },
+  accessoriesList: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  accessoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  checkbox: {
+    marginRight: Spacing.md,
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+  },
+  accessoryText: {
+    fontSize: 15,
+    flex: 1,
+  },
+  addAccessoryRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  addAccessoryInput: {
+    flex: 1,
+  },
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
   },
   photoSection: {
     marginBottom: Spacing.lg,

@@ -207,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Accès réservé aux commerciaux" });
       }
 
-      const { category_id, client_id, product_name, reference, serial_number, description, photo_url } = req.body;
+      const { category_id, client_id, product_name, reference, serial_number, description, photo_url, accessories } = req.body;
 
       if (!category_id || !client_id || !product_name || !reference || !serial_number) {
         return res.status(400).json({ message: "Champs requis manquants" });
@@ -222,6 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         serial_number,
         description: description || "",
         photo_url,
+        accessories: accessories || [],
       });
 
       res.status(201).json(declaration);
@@ -287,6 +288,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Resolve declaration error:", error);
       res.status(500).json({ message: "Erreur lors de la résolution" });
+    }
+  });
+
+  app.patch("/api/declarations/:id/remarks", authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      if (req.user?.role !== "technicien") {
+        return res.status(403).json({ message: "Accès réservé aux techniciens" });
+      }
+
+      const declaration = await storage.getDeclaration(req.params.id);
+      if (!declaration) {
+        return res.status(404).json({ message: "Déclaration non trouvée" });
+      }
+
+      if (declaration.technician_id !== req.user.id) {
+        return res.status(403).json({ message: "Vous n'êtes pas en charge de cette déclaration" });
+      }
+
+      const { technician_remarks } = req.body;
+
+      const updated = await storage.updateDeclaration(req.params.id, {
+        technician_remarks: technician_remarks || "",
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Update remarks error:", error);
+      res.status(500).json({ message: "Erreur lors de la mise à jour des remarques" });
     }
   });
 

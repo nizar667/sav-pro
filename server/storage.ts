@@ -26,6 +26,12 @@ export interface Category {
   name: string;
 }
 
+export interface AccessoryItem {
+  id: string;
+  name: string;
+  checked: boolean;
+}
+
 export interface Declaration {
   id: string;
   commercial_id: string;
@@ -42,6 +48,8 @@ export interface Declaration {
   status: DeclarationStatus;
   technician_id?: string;
   technician_name?: string;
+  accessories?: AccessoryItem[];
+  technician_remarks?: string;
   created_at: string;
   taken_at?: string;
   resolved_at?: string;
@@ -87,7 +95,7 @@ export class MemStorage implements IStorage {
     this.seedDemoData();
   }
 
-  private async seedDemoData() {
+  private seedDemoData() {
     const hashedPassword = bcrypt.hashSync("demo123", 10);
 
     const commercialId = "demo-commercial-001";
@@ -153,6 +161,11 @@ export class MemStorage implements IStorage {
       reference: "WW90T534DAW",
       serial_number: "SN-2024-001234",
       description: "Le lave-linge ne démarre plus. Affiche un code erreur E5.",
+      accessories: [
+        { id: "1", name: "Câble d'alimentation", checked: true },
+        { id: "2", name: "Manuel d'utilisation", checked: true },
+        { id: "3", name: "Garantie", checked: false },
+      ],
       status: "nouvelle",
       created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     });
@@ -166,8 +179,13 @@ export class MemStorage implements IStorage {
       reference: "LATITUDE-5520",
       serial_number: "DELL-2024-567890",
       description: "L'écran clignote de manière intermittente. Problème apparu après mise à jour.",
+      accessories: [
+        { id: "1", name: "Câble d'alimentation", checked: true },
+        { id: "2", name: "Sacoche", checked: true },
+      ],
       status: "en_cours",
       technician_id: technicianId,
+      technician_remarks: "Diagnostic en cours. Possible problème de carte graphique.",
       created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       taken_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
     });
@@ -181,8 +199,13 @@ export class MemStorage implements IStorage {
       reference: "FTXM35R",
       serial_number: "DAI-2023-987654",
       description: "Fuite d'eau au niveau de l'unité intérieure.",
+      accessories: [
+        { id: "1", name: "Télécommande", checked: true },
+        { id: "2", name: "Manuel d'utilisation", checked: true },
+      ],
       status: "reglee",
       technician_id: technicianId,
+      technician_remarks: "Joint d'évacuation remplacé. Fuite corrigée. Test effectué pendant 2h sans récidive.",
       created_at: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
       taken_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
       resolved_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),

@@ -14,6 +14,12 @@ export interface Client {
   commercial_id: string;
 }
 
+export interface AccessoryItem {
+  id: string;
+  name: string;
+  checked: boolean;
+}
+
 export interface Declaration {
   id: string;
   commercial_id: string;
@@ -30,6 +36,8 @@ export interface Declaration {
   status: DeclarationStatus;
   technician_id?: string;
   technician_name?: string;
+  accessories?: AccessoryItem[];
+  technician_remarks?: string;
   created_at: string;
   taken_at?: string;
   resolved_at?: string;
@@ -43,4 +51,13 @@ export const CATEGORIES: Category[] = [
   { id: "5", name: "Climatisation" },
   { id: "6", name: "Plomberie" },
   { id: "7", name: "Autre" },
+];
+
+export const DEFAULT_ACCESSORIES: string[] = [
+  "Câble d'alimentation",
+  "Télécommande",
+  "Manuel d'utilisation",
+  "Boîte d'origine",
+  "Accessoires d'origine",
+  "Garantie",
 ];
