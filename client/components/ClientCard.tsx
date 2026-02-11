@@ -8,6 +8,7 @@ import Animated, {
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+// import { useLanguage } from "@/contexts/LanguageContext"; // RETIREZ SI NON UTILISÉ
 import { BorderRadius, Spacing, Shadows } from "@/constants/theme";
 import { Client } from "@/types";
 
@@ -20,6 +21,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function ClientCard({ client, onPress }: ClientCardProps) {
   const { theme } = useTheme();
+  // const { t } = useLanguage(); // RETIREZ SI VOUS NE L'UTILISEZ PAS
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({

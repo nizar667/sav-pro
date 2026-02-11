@@ -9,6 +9,7 @@ import Animated, {
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLanguage } from "@/contexts/LanguageContext"; // AJOUTÉ
 import { Spacing, BorderRadius } from "@/constants/theme";
 
 interface CardProps {
@@ -18,6 +19,8 @@ interface CardProps {
   children?: React.ReactNode;
   onPress?: () => void;
   style?: ViewStyle;
+  tTitle?: string; // AJOUTÉ: clé de traduction pour le titre
+  tDescription?: string; // AJOUTÉ: clé de traduction pour la description
 }
 
 const springConfig: WithSpringConfig = {
@@ -53,8 +56,11 @@ export function Card({
   children,
   onPress,
   style,
+  tTitle, // AJOUTÉ
+  tDescription, // AJOUTÉ
 }: CardProps) {
   const { theme } = useTheme();
+  const { t } = useLanguage(); // AJOUTÉ
   const scale = useSharedValue(1);
 
   const cardBackgroundColor = getBackgroundColorForElevation(elevation, theme);
@@ -71,6 +77,10 @@ export function Card({
     scale.value = withSpring(1, springConfig);
   };
 
+  // Utiliser la traduction si disponible
+  const displayTitle = tTitle ? t(tTitle) : title;
+  const displayDescription = tDescription ? t(tDescription) : description;
+
   return (
     <AnimatedPressable
       onPress={onPress}
@@ -85,14 +95,14 @@ export function Card({
         style,
       ]}
     >
-      {title ? (
+      {displayTitle ? (
         <ThemedText type="h4" style={styles.cardTitle}>
-          {title}
+          {displayTitle}
         </ThemedText>
       ) : null}
-      {description ? (
+      {displayDescription ? (
         <ThemedText type="small" style={styles.cardDescription}>
-          {description}
+          {displayDescription}
         </ThemedText>
       ) : null}
       {children}

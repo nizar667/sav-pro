@@ -10,7 +10,7 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     name: string;
-    role: "commercial" | "technicien";
+    role: "commercial" | "technicien" | "admin";
   };
 }
 
@@ -28,11 +28,13 @@ export function generateToken(user: User): string {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  // Pour l'instant retourne le mot de passe en clair
+  return password;
 }
 
 export async function comparePassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+  // Comparaison simple en clair TEMPORAIREMENT
+  return password === hash;
 }
 
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
@@ -49,7 +51,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
       id: string;
       email: string;
       name: string;
-      role: "commercial" | "technicien";
+      role: "commercial" | "technicien" | "admin";
     };
 
     req.user = decoded;

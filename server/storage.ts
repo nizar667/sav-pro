@@ -1,8 +1,9 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 
-export type UserRole = "commercial" | "technicien";
+export type UserRole = "commercial" | "technicien" | "admin";
 export type DeclarationStatus = "nouvelle" | "en_cours" | "reglee";
+export type UserStatus = "en_attente" | "actif" | "refuse";
 
 export interface User {
   id: string;
@@ -10,6 +11,8 @@ export interface User {
   password: string;
   name: string;
   role: UserRole;
+  status: UserStatus;
+  created_at: string;
 }
 
 export interface Client {
@@ -59,7 +62,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: Omit<User, "id">): Promise<User>;
-
+  getPendingUsers(): Promise<User[]>;
+  updateUserStatus(id: string, status: UserStatus): Promise<User | undefined>;
+  
   getClients(commercialId: string): Promise<Client[]>;
   getClient(id: string): Promise<Client | undefined>;
   createClient(client: Omit<Client, "id">): Promise<Client>;
@@ -96,25 +101,57 @@ export class MemStorage implements IStorage {
   }
 
   private seedDemoData() {
-    const hashedPassword = bcrypt.hashSync("demo123", 10);
+    // Mots de passe en clair TEMPORAIREMENT
+    const passwordDemo123 = "demo123";
+    const passwordAdmin123 = "admin123";
+
+    // COMPTE ADMIN PAR DÉFAUT
+    const adminId = "admin-001";
+    this.users.set(adminId, {
+      id: adminId,
+      email: "admin@sav.com",
+      password: passwordAdmin123, // admin123
+      name: "Administrateur",
+      role: "admin",
+      status: "actif",
+      created_at: new Date().toISOString(),
+    });
 
     const commercialId = "demo-commercial-001";
     const technicianId = "demo-technicien-001";
 
+    // Compte commercial (actif pour démo)
     this.users.set(commercialId, {
       id: commercialId,
       email: "commercial@demo.com",
-      password: hashedPassword,
+      password: passwordDemo123, // demo123
       name: "Marie Dupont",
       role: "commercial",
+      status: "actif",
+      created_at: new Date().toISOString(),
     });
 
+    // Compte technicien (actif pour démo)
     this.users.set(technicianId, {
       id: technicianId,
       email: "technicien@demo.com",
-      password: hashedPassword,
+      password: passwordDemo123, // demo123
       name: "Pierre Martin",
       role: "technicien",
+      status: "actif",
+      created_at: new Date().toISOString(),
+    });
+
+    // Ajouter quelques comptes en attente pour démo
+    const pendingCommercialId = "pending-commercial-001";
+    this.users.set(pendingCommercialId, {
+      id: pendingCommercialId,
+      email: "pending@demo.com",
+      password: passwordDemo123, // demo123
+      name: "Jean En Attente",
+      role: "commercial",
+      status: "en_attente",
+      created_at: new Date(Date.now() - 86400000).toISOString(), // Hier
     });
 
     const client1Id = "demo-client-001";
@@ -211,12 +248,16 @@ export class MemStorage implements IStorage {
       resolved_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    console.log("Demo data seeded successfully!");
+    console.log("📊 DEMO DATA SEEDED SUCCESSFULLY!");
+    console.log("-----------------------------------");
+    console.log("COMPTES ADMINISTRATEUR:");
+    console.log("Email: admin@sav.com");
+    console.log("Mot de passe: admin123");
     console.log("-----------------------------------");
     console.log("COMPTES DE DÉMONSTRATION:");
-    console.log("-----------------------------------");
     console.log("Commercial: commercial@demo.com / demo123");
     console.log("Technicien: technicien@demo.com / demo123");
+    console.log("Compte en attente: pending@demo.com / demo123");
     console.log("-----------------------------------");
   }
 
@@ -235,6 +276,21 @@ export class MemStorage implements IStorage {
     const user: User = { ...userData, id };
     this.users.set(id, user);
     return user;
+  }
+
+  async getPendingUsers(): Promise<User[]> {
+    return Array.from(this.users.values())
+      .filter(user => user.status === "en_attente")
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }
+
+  async updateUserStatus(id: string, status: UserStatus): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+
+    const updated = { ...user, status };
+    this.users.set(id, updated);
+    return updated;
   }
 
   async getClients(commercialId: string): Promise<Client[]> {

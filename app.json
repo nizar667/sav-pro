@@ -45,7 +45,8 @@
         {
           "photosPermission": "L'application a besoin d'accéder à vos photos pour joindre des images aux déclarations."
         }
-      ]
+      ],
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "reactCompiler": true

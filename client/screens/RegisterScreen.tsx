@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { View, StyleSheet, Alert, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { ThemedText } from "@/components/ThemedText";
@@ -9,13 +11,19 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { AuthStackParamList } from "@/navigation/AuthStackNavigator";
+
+type NavigationProp = NativeStackNavigationProp<AuthStackParamList, "Register">;
 
 export default function RegisterScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+  const navigation = useNavigation<NavigationProp>();
   const { register } = useAuth();
+  const { t } = useLanguage();
   
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -29,23 +37,23 @@ export default function RegisterScreen() {
     const newErrors: Record<string, string> = {};
     
     if (!name.trim()) {
-      newErrors.name = "Le nom est requis";
+      newErrors.name = t("fieldRequired");
     }
     
     if (!email.trim()) {
-      newErrors.email = "L'email est requis";
+      newErrors.email = t("fieldRequired");
     } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = "Email invalide";
+      newErrors.email = t("invalidEmail");
     }
     
     if (!password) {
-      newErrors.password = "Le mot de passe est requis";
+      newErrors.password = t("fieldRequired");
     } else if (password.length < 6) {
-      newErrors.password = "Le mot de passe doit contenir au moins 6 caractères";
+      newErrors.password = t("passwordMinLength");
     }
     
     if (password !== confirmPassword) {
-      newErrors.confirmPassword = "Les mots de passe ne correspondent pas";
+      newErrors.confirmPassword = t("passwordsDontMatch");
     }
     
     setErrors(newErrors);
@@ -57,11 +65,18 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     try {
-      await register(email.trim().toLowerCase(), password, name.trim(), role);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const result = await register(email.trim().toLowerCase(), password, name.trim(), role);
+      
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        navigation.navigate("WaitingApproval");
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(t("information"), result.message || t("registerSuccess"));
+      }
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Erreur", error.message || "Échec de l'inscription");
+      Alert.alert(t("error"), error.message || t("registerFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -79,15 +94,15 @@ export default function RegisterScreen() {
       ]}
     >
       <ThemedText type="h2" style={styles.title}>
-        Créer un compte
+        {t("register")}
       </ThemedText>
       <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
-        Rejoignez SAV Pro pour gérer vos déclarations
+        {t("approvalMessage")}
       </ThemedText>
 
       <View style={styles.roleSelector}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-          Je suis un
+          {t("role")}
         </ThemedText>
         <View style={styles.roleButtons}>
           <Pressable
@@ -107,7 +122,7 @@ export default function RegisterScreen() {
                 { color: role === "commercial" ? "#FFFFFF" : theme.text },
               ]}
             >
-              Commercial
+              {t("commercial")}
             </ThemedText>
           </Pressable>
           <Pressable
@@ -127,15 +142,15 @@ export default function RegisterScreen() {
                 { color: role === "technicien" ? "#FFFFFF" : theme.text },
               ]}
             >
-              Technicien
+              {t("technician")}
             </ThemedText>
           </Pressable>
         </View>
       </View>
 
       <Input
-        label="Nom complet"
-        placeholder="Jean Dupont"
+        label={t("fullName")}
+        placeholder={t("fullName")}
         value={name}
         onChangeText={setName}
         autoCapitalize="words"
@@ -143,7 +158,7 @@ export default function RegisterScreen() {
       />
 
       <Input
-        label="Email"
+        label={t("email")}
         placeholder="votre@email.com"
         value={email}
         onChangeText={setEmail}
@@ -154,8 +169,8 @@ export default function RegisterScreen() {
       />
 
       <Input
-        label="Mot de passe"
-        placeholder="Au moins 6 caractères"
+        label={t("password")}
+        placeholder={t("password")}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -163,21 +178,36 @@ export default function RegisterScreen() {
       />
 
       <Input
-        label="Confirmer le mot de passe"
-        placeholder="Répétez votre mot de passe"
+        label={t("confirmPassword")}
+        placeholder={t("confirmPassword")}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
         error={errors.confirmPassword}
       />
 
+      <ThemedText style={[styles.note, { color: theme.textTertiary }]}>
+        ⓘ {t("approvalMessage")}. {t("approvalNotification")}
+      </ThemedText>
+
       <Button
         onPress={handleRegister}
         disabled={isLoading}
         style={styles.registerButton}
       >
-        {isLoading ? "Inscription..." : "S'inscrire"}
+        {isLoading ? t("loading") : t("registerButton")}
       </Button>
+
+      <View style={styles.footer}>
+        <ThemedText style={{ color: theme.textSecondary }}>
+          {t("haveAccount")}{" "}
+        </ThemedText>
+        <Pressable onPress={() => navigation.navigate("Login")}>
+          <ThemedText style={{ color: theme.primary, fontWeight: "600" }}>
+            {t("login")}
+          </ThemedText>
+        </Pressable>
+      </View>
     </KeyboardAwareScrollViewCompat>
   );
 }
@@ -221,7 +251,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  note: {
+    fontSize: 13,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.lg,
+    lineHeight: 18,
+  },
   registerButton: {
     marginTop: Spacing.lg,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: Spacing["2xl"],
   },
 });

@@ -1,31 +1,28 @@
 import React from "react";
-import { View, StyleSheet, Image, ImageSourcePropType } from "react-native";
-import { ThemedText } from "@/components/ThemedText";
+import { View, StyleSheet, Image } from "react-native";
+import { ThemedText } from "./ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing } from "@/constants/theme";
+// import { useLanguage } from "@/contexts/LanguageContext"; // RETIREZ SI NON UTILISÉ
 
 interface EmptyStateProps {
-  image: ImageSourcePropType;
-  title: string;
-  message?: string;
+  image: any;
+  title: string; // Le titre est déjà passé comme prop
+  message: string; // Le message est déjà passé comme prop
 }
 
 export function EmptyState({ image, title, message }: EmptyStateProps) {
   const { theme } = useTheme();
+  // const { t } = useLanguage(); // RETIREZ SI NON UTILISÉ
 
   return (
     <View style={styles.container}>
       <Image source={image} style={styles.image} resizeMode="contain" />
       <ThemedText type="h4" style={styles.title}>
-        {title}
+        {title} {/* Utilisez directement la prop */}
       </ThemedText>
-      {message ? (
-        <ThemedText
-          style={[styles.message, { color: theme.textSecondary }]}
-        >
-          {message}
-        </ThemedText>
-      ) : null}
+      <ThemedText style={[styles.message, { color: theme.textSecondary }]}>
+        {message} {/* Utilisez directement la prop */}
+      </ThemedText>
     </View>
   );
 }
@@ -35,20 +32,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: Spacing["3xl"],
+    paddingVertical: 48,
   },
   image: {
-    width: 160,
-    height: 160,
-    marginBottom: Spacing.xl,
-    opacity: 0.8,
+    width: 200,
+    height: 200,
+    marginBottom: 24,
   },
   title: {
+    marginBottom: 8,
     textAlign: "center",
-    marginBottom: Spacing.sm,
   },
   message: {
     textAlign: "center",
-    fontSize: 14,
+    fontSize: 16,
+    lineHeight: 24,
+    maxWidth: 300,
   },
 });

@@ -1,24 +1,27 @@
+// navigation/RootStackNavigator.tsx
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
-import MainTabNavigator from "@/navigation/MainTabNavigator";
-import AuthStackNavigator from "@/navigation/AuthStackNavigator";
-import DeclarationDetailScreen from "@/screens/DeclarationDetailScreen";
-import NewDeclarationScreen from "@/screens/NewDeclarationScreen";
-import NewClientScreen from "@/screens/NewClientScreen";
-import ClientDetailScreen from "@/screens/ClientDetailScreen";
-import { useScreenOptions } from "@/hooks/useScreenOptions";
-import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/hooks/useTheme";
-import { Declaration, Client } from "@/types";
+import MainTabNavigator from "./MainTabNavigator";
+import AuthStackNavigator from "./AuthStackNavigator";
+import DeclarationDetailScreen from "../screens/DeclarationDetailScreen"; // ← Chemin relatif CORRECT
+import NewDeclarationScreen from "../screens/NewDeclarationScreen";
+import NewClientScreen from "../screens/NewClientScreen";
+import ClientDetailScreen from "../screens/ClientDetailScreen";
+import AllUsersScreen from "../screens/AllUsersScreen";
+import { useScreenOptions } from "../hooks/useScreenOptions";
+import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../hooks/useTheme";
+import { Declaration, Client } from "../types";
 
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
-  DeclarationDetail: { declaration: Declaration };
+  DeclarationDetail: { declaration: Declaration } | { declarationId: string };
   NewDeclaration: undefined;
   NewClient: undefined;
   ClientDetail: { client: Client };
+  AllUsers: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -70,6 +73,14 @@ export default function RootStackNavigator() {
             name="ClientDetail"
             component={ClientDetailScreen}
             options={{ headerTitle: "Client" }}
+          />
+          <Stack.Screen
+            name="AllUsers"
+            component={AllUsersScreen}
+            options={{ 
+              headerTitle: "Tous les utilisateurs",
+              presentation: "modal",
+            }}
           />
         </>
       ) : (

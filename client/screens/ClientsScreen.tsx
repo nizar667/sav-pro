@@ -7,6 +7,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing } from "@/constants/theme";
 import { ClientCard } from "@/components/ClientCard";
 import { EmptyState } from "@/components/EmptyState";
@@ -23,6 +24,7 @@ export default function ClientsScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { token } = useAuth();
+  const { t } = useLanguage();
 
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +40,8 @@ export default function ClientsScreen() {
       if (response.ok) {
         const data = await response.json();
         setClients(data);
+      } else {
+        console.error("Failed to fetch clients:", response.status);
       }
     } catch (error) {
       console.error("Failed to fetch clients:", error);
@@ -61,7 +65,7 @@ export default function ClientsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-        <LoadingSpinner message="Chargement des clients..." />
+        <LoadingSpinner message={t("loadingClients")} />
       </View>
     );
   }
@@ -97,8 +101,8 @@ export default function ClientsScreen() {
         ListEmptyComponent={
           <EmptyState
             image={require("../../assets/images/empty-clients.png")}
-            title="Aucun client"
-            message="Appuyez sur + pour ajouter votre premier client"
+            title={t("noClients")}
+            message={t("emptyClientsMessage")}
           />
         }
       />

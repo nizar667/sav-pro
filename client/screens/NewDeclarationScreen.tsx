@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect } from "react";
-import { View, StyleSheet, Image, Pressable, Alert, Platform } from "react-native";
+import { View, StyleSheet, Image, Pressable, Alert, Platform, TextInput, ScrollView, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
@@ -8,13 +8,11 @@ import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import Checkbox from "expo-checkbox";
-import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { ThemedText } from "@/components/ThemedText";
-import { Input } from "@/components/Input";
-import { TextArea } from "@/components/TextArea";
 import { Picker } from "@/components/Picker";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { CATEGORIES, Client, AccessoryItem, DEFAULT_ACCESSORIES } from "@/types";
 import { getApiUrl } from "@/lib/query-client";
@@ -25,6 +23,7 @@ export default function NewDeclarationScreen() {
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation();
   const { token } = useAuth();
+  const { t } = useLanguage();
 
   const [categoryId, setCategoryId] = useState("");
   const [productName, setProductName] = useState("");
@@ -40,11 +39,17 @@ export default function NewDeclarationScreen() {
   const [accessories, setAccessories] = useState<AccessoryItem[]>(
     DEFAULT_ACCESSORIES.map((name, index) => ({
       id: String(index + 1),
-      name,
+      name: name,
       checked: false,
     }))
   );
   const [customAccessory, setCustomAccessory] = useState("");
+
+  // Références pour stocker les valeurs COMPLÈTES
+  const serialNumberRef = React.useRef("");
+  const descriptionRef = React.useRef("");
+  const productNameRef = React.useRef("");
+  const referenceRef = React.useRef("");
 
   useEffect(() => {
     fetchClients();
@@ -72,7 +77,7 @@ export default function NewDeclarationScreen() {
     navigation.setOptions({
       headerLeft: () => (
         <HeaderButton onPress={() => navigation.goBack()}>
-          <ThemedText style={{ color: theme.primary }}>Annuler</ThemedText>
+          <ThemedText style={{ color: theme.primary }}>{t("cancel")}</ThemedText>
         </HeaderButton>
       ),
       headerRight: () => (
@@ -83,19 +88,20 @@ export default function NewDeclarationScreen() {
               fontWeight: "600",
             }}
           >
-            {isLoading ? "..." : "Créer"}
+            {isLoading ? "..." : t("create")}
           </ThemedText>
         </HeaderButton>
       ),
+      headerTitle: t("newDeclaration"),
     });
-  }, [navigation, theme, isValid, isLoading, categoryId, productName, reference, serialNumber, clientId, description, photoUri, accessories]);
+  }, [navigation, theme, isValid, isLoading, t]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert(
-        "Permission requise",
-        "L'accès à la galerie est nécessaire pour ajouter une photo."
+        t("permissionRequired"),
+        t("galleryPermissionMessage")
       );
       return;
     }
@@ -116,8 +122,8 @@ export default function NewDeclarationScreen() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert(
-        "Permission requise",
-        "L'accès à la caméra est nécessaire pour prendre une photo."
+        t("permissionRequired"),
+        t("cameraPermissionMessage")
       );
       return;
     }
@@ -139,10 +145,10 @@ export default function NewDeclarationScreen() {
       return;
     }
 
-    Alert.alert("Ajouter une photo", "Comment voulez-vous ajouter une photo ?", [
-      { text: "Annuler", style: "cancel" },
-      { text: "Galerie", onPress: pickImage },
-      { text: "Caméra", onPress: takePhoto },
+    Alert.alert(t("addPhoto"), t("howToAddPhoto"), [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("gallery"), onPress: pickImage },
+      { text: t("camera"), onPress: takePhoto },
     ]);
   };
 
@@ -174,18 +180,61 @@ export default function NewDeclarationScreen() {
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!categoryId) newErrors.category = "Sélectionnez une catégorie";
-    if (!productName.trim()) newErrors.productName = "Le nom du produit est requis";
-    if (!reference.trim()) newErrors.reference = "La référence est requise";
-    if (!serialNumber.trim()) newErrors.serialNumber = "Le numéro de série est requis";
-    if (!clientId) newErrors.client = "Sélectionnez un client";
+    if (!categoryId) newErrors.category = t("fieldRequired");
+    if (!productName.trim()) newErrors.productName = t("fieldRequired");
+    if (!reference.trim()) newErrors.reference = t("fieldRequired");
+    if (!serialNumber.trim()) newErrors.serialNumber = t("fieldRequired");
+    if (!clientId) newErrors.client = t("fieldRequired");
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // SOLUTION CRITIQUE : Utiliser onChange au lieu de onChangeText
+  const handleSerialNumberChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const text = e.nativeEvent.text;
+    console.log("🔍 SerialNumber (onChange):", text, "length:", text.length);
+    setSerialNumber(text);
+    serialNumberRef.current = text;
+  };
+
+  const handleDescriptionChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const text = e.nativeEvent.text;
+    console.log("🔍 Description (onChange):", text, "length:", text.length);
+    setDescription(text);
+    descriptionRef.current = text;
+  };
+
+  const handleProductNameChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const text = e.nativeEvent.text;
+    setProductName(text);
+    productNameRef.current = text;
+  };
+
+  const handleReferenceChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const text = e.nativeEvent.text;
+    setReference(text);
+    referenceRef.current = text;
+  };
+
   const handleSubmit = async () => {
+    console.log("🔄 SUBMIT - Valeurs FINALES:");
+    console.log("serialNumber (state):", serialNumber);
+    console.log("serialNumber (ref):", serialNumberRef.current);
+    console.log("description (state):", description);
+    console.log("description (ref):", descriptionRef.current);
+    
     if (!validate()) return;
+
+    // Utiliser la valeur du ref (toujours complète)
+    const finalSerialNumber = serialNumberRef.current || serialNumber;
+    const finalDescription = descriptionRef.current || description;
+    const finalProductName = productNameRef.current || productName;
+    const finalReference = referenceRef.current || reference;
+
+    console.log("🎯 Valeurs utilisées pour l'envoi:");
+    console.log("serial_number:", finalSerialNumber);
+    console.log("description:", finalDescription);
 
     setIsLoading(true);
     try {
@@ -218,22 +267,26 @@ export default function NewDeclarationScreen() {
 
       const checkedAccessories = accessories.filter((a) => a.checked);
 
+      const requestData = {
+        category_id: categoryId,
+        client_id: clientId,
+        product_name: finalProductName.trim(),
+        reference: finalReference.trim(),
+        serial_number: finalSerialNumber.trim(),
+        description: finalDescription.trim(),
+        photo_url: photoUrl,
+        accessories: checkedAccessories,
+      };
+
+      console.log("📤 Envoi au backend:", JSON.stringify(requestData, null, 2));
+
       const response = await fetch(new URL("/api/declarations", baseUrl).href, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          category_id: categoryId,
-          client_id: clientId,
-          product_name: productName.trim(),
-          reference: reference.trim(),
-          serial_number: serialNumber.trim(),
-          description: description.trim(),
-          photo_url: photoUrl,
-          accessories: checkedAccessories,
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (response.ok) {
@@ -241,11 +294,11 @@ export default function NewDeclarationScreen() {
         navigation.goBack();
       } else {
         const error = await response.json();
-        throw new Error(error.message || "Échec de la création");
+        throw new Error(error.message || t("operationFailed"));
       }
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Erreur", error.message);
+      Alert.alert(t("error"), error.message);
     } finally {
       setIsLoading(false);
     }
@@ -254,7 +307,7 @@ export default function NewDeclarationScreen() {
   const clientOptions = clients.map((c) => ({ id: c.id, name: c.name }));
 
   return (
-    <KeyboardAwareScrollViewCompat
+    <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={[
         styles.content,
@@ -265,62 +318,132 @@ export default function NewDeclarationScreen() {
       ]}
     >
       <Picker
-        label="Catégorie *"
-        placeholder="Sélectionner une catégorie"
+        label={`${t("category")} *`}
+        placeholder={t("selectCategory")}
         value={categoryId}
-        options={CATEGORIES}
+        options={CATEGORIES.map(cat => ({
+          id: cat.id,
+          name: cat.name
+        }))}
         onSelect={(opt) => setCategoryId(opt.id)}
         error={errors.category}
       />
 
       <Picker
-        label="Client *"
-        placeholder="Sélectionner un client"
+        label={`${t("client")} *`}
+        placeholder={t("selectClient")}
         value={clientId}
         options={clientOptions}
         onSelect={(opt) => setClientId(opt.id)}
         error={errors.client}
       />
 
-      <Input
-        label="Nom du produit *"
-        placeholder="Ex: Lave-linge Samsung"
-        value={productName}
-        onChangeText={setProductName}
-        error={errors.productName}
-      />
+      {/* PRODUCT NAME - CORRIGÉ */}
+      <View style={styles.fieldContainer}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          {t("productName")} *
+        </ThemedText>
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor: theme.backgroundDefault,
+              color: theme.text,
+              borderColor: errors.productName ? theme.primary : theme.border,
+            },
+          ]}
+          placeholder={t("productName")}
+          value={productName}
+          onChange={handleProductNameChange}
+        />
+        {errors.productName && (
+          <ThemedText style={[styles.error, { color: theme.primary }]}>
+            {errors.productName}
+          </ThemedText>
+        )}
+      </View>
 
-      <Input
-        label="Référence *"
-        placeholder="Ex: WW90T534DAW"
-        value={reference}
-        onChangeText={setReference}
-        autoCapitalize="characters"
-        error={errors.reference}
-      />
+      {/* REFERENCE - CORRIGÉ */}
+      <View style={styles.fieldContainer}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          {t("reference")} *
+        </ThemedText>
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor: theme.backgroundDefault,
+              color: theme.text,
+              borderColor: errors.reference ? theme.primary : theme.border,
+            },
+          ]}
+          placeholder={t("reference")}
+          value={reference}
+          onChange={handleReferenceChange}
+          autoCapitalize="characters"
+        />
+        {errors.reference && (
+          <ThemedText style={[styles.error, { color: theme.primary }]}>
+            {errors.reference}
+          </ThemedText>
+        )}
+      </View>
 
-      <Input
-        label="Numéro de série *"
-        placeholder="Ex: S/N 123456789"
-        value={serialNumber}
-        onChangeText={setSerialNumber}
-        autoCapitalize="characters"
-        error={errors.serialNumber}
-      />
+      {/* SERIAL NUMBER - CORRIGÉ (SOLUTION) */}
+      <View style={styles.fieldContainer}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          {t("serialNumber")} *
+        </ThemedText>
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor: theme.backgroundDefault,
+              color: theme.text,
+              borderColor: errors.serialNumber ? theme.primary : theme.border,
+            },
+          ]}
+          placeholder={t("serialNumber")}
+          value={serialNumber}
+          onChange={handleSerialNumberChange} // ← CHANGÉ ICI
+          autoCapitalize="characters"
+        />
+        {errors.serialNumber && (
+          <ThemedText style={[styles.error, { color: theme.primary }]}>
+            {errors.serialNumber}
+          </ThemedText>
+        )}
+      </View>
 
-      <TextArea
-        label="Description du problème"
-        placeholder="Décrivez le problème rencontré..."
-        value={description}
-        onChangeText={setDescription}
-      />
+      {/* DESCRIPTION - CORRIGÉ (SOLUTION) */}
+      <View style={styles.fieldContainer}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          {t("problemDescription")}
+        </ThemedText>
+        <TextInput
+          style={[
+            styles.textArea,
+            {
+              backgroundColor: theme.backgroundDefault,
+              color: theme.text,
+              borderColor: theme.border,
+            },
+          ]}
+          placeholder={t("problemDescription")}
+          value={description}
+          onChange={handleDescriptionChange} // ← CHANGÉ ICI
+          multiline
+          numberOfLines={6}
+          textAlignVertical="top"
+        />
+      </View>
 
       <View style={styles.accessoriesSection}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-          Faux Client (Accessoires inclus)
+          {t("accessoriesIncluded")}
         </ThemedText>
         <ThemedText style={[styles.hint, { color: theme.textTertiary }]}>
-          Cochez les éléments fournis avec le produit
+          {t("checkProvidedItems")}
         </ThemedText>
         
         <View style={[styles.accessoriesList, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
@@ -349,8 +472,16 @@ export default function NewDeclarationScreen() {
 
         <View style={styles.addAccessoryRow}>
           <View style={styles.addAccessoryInput}>
-            <Input
-              placeholder="Ajouter un autre élément..."
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.backgroundDefault,
+                  color: theme.text,
+                  borderColor: theme.border,
+                },
+              ]}
+              placeholder={t("addAnotherItem")}
               value={customAccessory}
               onChangeText={setCustomAccessory}
               onSubmitEditing={addCustomAccessory}
@@ -369,7 +500,7 @@ export default function NewDeclarationScreen() {
 
       <View style={styles.photoSection}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-          Photo (optionnelle)
+          {t("photo")} ({t("optional")})
         </ThemedText>
         <Pressable
           style={[
@@ -387,18 +518,18 @@ export default function NewDeclarationScreen() {
             <View style={styles.photoPlaceholder}>
               <Feather name="camera" size={32} color={theme.textSecondary} />
               <ThemedText style={[styles.photoText, { color: theme.textSecondary }]}>
-                Ajouter une photo
+                {t("addPhoto")}
               </ThemedText>
             </View>
           )}
         </Pressable>
         {photoUri ? (
           <Pressable onPress={() => setPhotoUri(null)} style={styles.removePhoto}>
-            <ThemedText style={{ color: theme.primary }}>Supprimer la photo</ThemedText>
+            <ThemedText style={{ color: theme.primary }}>{t("removePhoto")}</ThemedText>
           </Pressable>
         ) : null}
       </View>
-    </KeyboardAwareScrollViewCompat>
+    </ScrollView>
   );
 }
 
@@ -409,10 +540,33 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.xl,
   },
+  fieldContainer: {
+    marginBottom: Spacing.lg,
+  },
   label: {
     fontSize: 14,
     fontWeight: "500",
     marginBottom: Spacing.sm,
+  },
+  input: {
+    height: Spacing.inputHeight,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.lg,
+    fontSize: 16,
+    borderWidth: 1,
+  },
+  textArea: {
+    minHeight: 120,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    fontSize: 16,
+    borderWidth: 1,
+    textAlignVertical: 'top',
+  },
+  error: {
+    fontSize: 12,
+    marginTop: Spacing.xs,
   },
   hint: {
     fontSize: 12,

@@ -7,6 +7,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -14,6 +15,7 @@ type RouteParams = RouteProp<RootStackParamList, "ClientDetail">;
 
 export default function ClientDetailScreen() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const route = useRoute<RouteParams>();
@@ -57,20 +59,20 @@ export default function ClientDetailScreen() {
           onPress={handleCall}
         >
           <Feather name="phone" size={20} color="#FFFFFF" />
-          <ThemedText style={styles.actionText}>Appeler</ThemedText>
+          <ThemedText style={styles.actionText}>{t("call")}</ThemedText>
         </Pressable>
         <Pressable
           style={[styles.actionButton, { backgroundColor: theme.secondary }]}
           onPress={handleEmail}
         >
           <Feather name="mail" size={20} color="#FFFFFF" />
-          <ThemedText style={styles.actionText}>Email</ThemedText>
+          <ThemedText style={styles.actionText}>{t("emailAction")}</ThemedText>
         </Pressable>
       </View>
 
       <View style={[styles.section, { backgroundColor: theme.backgroundDefault, ...Shadows.small }]}>
         <ThemedText type="h4" style={styles.sectionTitle}>
-          Coordonnées
+          {t("coordinates")}
         </ThemedText>
         
         <Pressable style={styles.row} onPress={handleEmail}>
@@ -79,7 +81,7 @@ export default function ClientDetailScreen() {
           </View>
           <View style={styles.rowContent}>
             <ThemedText style={[styles.rowLabel, { color: theme.textSecondary }]}>
-              Email
+              {t("email")}
             </ThemedText>
             <ThemedText style={{ color: theme.link }}>{client.email}</ThemedText>
           </View>
@@ -91,7 +93,7 @@ export default function ClientDetailScreen() {
           </View>
           <View style={styles.rowContent}>
             <ThemedText style={[styles.rowLabel, { color: theme.textSecondary }]}>
-              Téléphone
+              {t("clientPhone")}
             </ThemedText>
             <ThemedText style={{ color: theme.link }}>{client.phone}</ThemedText>
           </View>
@@ -104,7 +106,7 @@ export default function ClientDetailScreen() {
             </View>
             <View style={styles.rowContent}>
               <ThemedText style={[styles.rowLabel, { color: theme.textSecondary }]}>
-                Adresse
+                {t("clientAddress")}
               </ThemedText>
               <ThemedText>{client.address}</ThemedText>
             </View>

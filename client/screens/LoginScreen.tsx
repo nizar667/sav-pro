@@ -9,6 +9,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing } from "@/constants/theme";
 import { AuthStackParamList } from "@/navigation/AuthStackNavigator";
 
@@ -20,6 +21,7 @@ export default function LoginScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
+  const { t } = useLanguage();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,13 +32,13 @@ export default function LoginScreen({ navigation }: Props) {
     const newErrors: { email?: string; password?: string } = {};
     
     if (!email.trim()) {
-      newErrors.email = "L'email est requis";
+      newErrors.email = t("fieldRequired");
     } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = "Email invalide";
+      newErrors.email = t("invalidEmail");
     }
     
     if (!password) {
-      newErrors.password = "Le mot de passe est requis";
+      newErrors.password = t("fieldRequired");
     }
     
     setErrors(newErrors);
@@ -52,7 +54,7 @@ export default function LoginScreen({ navigation }: Props) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Erreur", error.message || "Échec de la connexion");
+      Alert.alert(t("error"), error.message || t("invalidCredentials"));
     } finally {
       setIsLoading(false);
     }
@@ -76,16 +78,16 @@ export default function LoginScreen({ navigation }: Props) {
           resizeMode="contain"
         />
         <ThemedText type="h1" style={styles.title}>
-          SAV Pro
+          {t("appName")}
         </ThemedText>
         <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Service Après-Vente Professionnel
+          {t("appSubtitle")}
         </ThemedText>
       </View>
 
       <View style={styles.form}>
         <Input
-          label="Email"
+          label={t("email")}
           placeholder="votre@email.com"
           value={email}
           onChangeText={setEmail}
@@ -96,8 +98,8 @@ export default function LoginScreen({ navigation }: Props) {
         />
 
         <Input
-          label="Mot de passe"
-          placeholder="Votre mot de passe"
+          label={t("password")}
+          placeholder={t("yourPassword")}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -109,17 +111,17 @@ export default function LoginScreen({ navigation }: Props) {
           disabled={isLoading}
           style={styles.loginButton}
         >
-          {isLoading ? "Connexion..." : "Se connecter"}
+          {isLoading ? t("loading") : t("loginButton")}
         </Button>
       </View>
 
       <View style={styles.footer}>
         <ThemedText style={{ color: theme.textSecondary }}>
-          Pas encore de compte ?{" "}
+          {t("noAccount")}{" "}
         </ThemedText>
         <Pressable onPress={() => navigation.navigate("Register")}>
           <ThemedText style={{ color: theme.primary, fontWeight: "600" }}>
-            S'inscrire
+            {t("register")}
           </ThemedText>
         </Pressable>
       </View>

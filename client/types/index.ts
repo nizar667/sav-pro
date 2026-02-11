@@ -1,3 +1,4 @@
+// types/index.ts - CORRIGÉ
 export type DeclarationStatus = "nouvelle" | "en_cours" | "reglee";
 
 export interface Category {
@@ -12,6 +13,11 @@ export interface Client {
   phone: string;
   address: string;
   commercial_id: string;
+  commercial?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
 export interface AccessoryItem {
@@ -23,10 +29,18 @@ export interface AccessoryItem {
 export interface Declaration {
   id: string;
   commercial_id: string;
+  commercial?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
   commercial_name?: string;
   client_id: string;
+  client?: Client;
   client_name?: string;
   category_id: string;
+  category?: Category;
   category_name?: string;
   product_name: string;
   reference: string;
@@ -35,6 +49,12 @@ export interface Declaration {
   photo_url?: string;
   status: DeclarationStatus;
   technician_id?: string;
+  technician?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
   technician_name?: string;
   accessories?: AccessoryItem[];
   technician_remarks?: string;
@@ -43,14 +63,19 @@ export interface Declaration {
   resolved_at?: string;
 }
 
+// NOUVELLES CATÉGORIES - CORRESPONDANT À VOTRE SUPABASE
 export const CATEGORIES: Category[] = [
-  { id: "1", name: "Électroménager" },
-  { id: "2", name: "Informatique" },
-  { id: "3", name: "Téléphonie" },
-  { id: "4", name: "Audio/Vidéo" },
-  { id: "5", name: "Climatisation" },
-  { id: "6", name: "Plomberie" },
-  { id: "7", name: "Autre" },
+   { id: "1", name: "Accessoires TV" },
+  { id: "2", name: "Audio & Son" },
+  { id: "3", name: "Caméra de surveillance" },
+  { id: "4", name: "Climat" },
+  { id: "5", name: "Machine à laver" },
+  { id: "6", name: "Petit électroménager" },
+  { id: "7", name: "Récepteur numérique" },
+  { id: "8", name: "Réfrigérateur & Congélateur" },
+  { id: "9", name: "Télévision" },
+  { id: "10", name: "Vélos Électriques" },
+  { id: "11", name: "Autres" }, // <-- AJOUTÉ
 ];
 
 export const DEFAULT_ACCESSORIES: string[] = [

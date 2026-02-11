@@ -1,12 +1,15 @@
+// components/ThemedText.tsx
 import { Text, type TextProps } from "react-native";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Typography } from "@/constants/theme";
 
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
   type?: "hero" | "title" | "h1" | "h2" | "h3" | "h4" | "headline" | "body" | "caption" | "small" | "tiny" | "link";
+  t?: string; // Clé de traduction optionnelle
 };
 
 export function ThemedText({
@@ -14,9 +17,12 @@ export function ThemedText({
   lightColor,
   darkColor,
   type = "body",
+  t, // Clé de traduction
+  children,
   ...rest
 }: ThemedTextProps) {
   const { theme, isDark } = useTheme();
+  const { t: translate } = useLanguage();
 
   const getColor = () => {
     if (isDark && darkColor) {
@@ -65,7 +71,12 @@ export function ThemedText({
     }
   };
 
+  // Utiliser la traduction si fournie, sinon le texte original
+  const textContent = t ? translate(t) : children;
+
   return (
-    <Text style={[{ color: getColor() }, getTypeStyle(), style]} {...rest} />
+    <Text style={[{ color: getColor() }, getTypeStyle(), style]} {...rest}>
+      {textContent}
+    </Text>
   );
 }

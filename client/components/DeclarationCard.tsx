@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable, Image } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -9,7 +9,8 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useTheme } from "@/hooks/useTheme";
-import { BorderRadius, Spacing, Shadows } from "@/constants/theme";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { BorderRadius, Spacing } from "@/constants/theme";
 import { Declaration } from "@/types";
 
 interface DeclarationCardProps {
@@ -21,6 +22,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -37,90 +39,118 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return t("today") || "Aujourd'hui";
+    } else if (diffDays === 1) {
+      return t("yesterday") || "Hier";
+    } else if (diffDays < 7) {
+      return t("daysAgo", { days: diffDays }) || `Il y a ${diffDays} jours`;
+    } else {
+      return date.toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "short",
+      });
+    }
   };
 
   return (
     <AnimatedPressable
       style={[
         styles.card,
-        { backgroundColor: theme.backgroundDefault, ...Shadows.small },
+        { 
+          backgroundColor: theme.backgroundDefault,
+          borderLeftWidth: 3,
+          borderLeftColor: 
+            declaration.status === "nouvelle" ? theme.primary :
+            declaration.status === "en_cours" ? theme.warning :
+            theme.success,
+        },
         animatedStyle,
       ]}
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
     >
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <StatusBadge status={declaration.status} />
-          {declaration.category_name ? (
-            <View
-              style={[
-                styles.categoryBadge,
-                { backgroundColor: theme.secondary + "20" },
-              ]}
-            >
-              <ThemedText
-                style={[styles.categoryText, { color: theme.secondary }]}
-              >
-                {declaration.category_name}
-              </ThemedText>
-            </View>
-          ) : null}
-        </View>
-        <ThemedText style={[styles.date, { color: theme.textSecondary }]}>
+      {/* Ligne 1: Statut + Date */}
+      <View style={styles.topRow}>
+        <StatusBadge status={declaration.status} size="small" />
+        <ThemedText style={[styles.date, { color: "#FFFFFF" }]}>
           {formatDate(declaration.created_at)}
         </ThemedText>
       </View>
 
-      <View style={styles.content}>
-        {declaration.photo_url ? (
-          <Image
-            source={{ uri: declaration.photo_url }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
-        ) : null}
-        <View style={[styles.info, { flex: declaration.photo_url ? undefined : 1 }]}>
-          <ThemedText type="h4" numberOfLines={1} style={styles.productName}>
-            {declaration.product_name}
-          </ThemedText>
-          <View style={styles.detailRow}>
-            <Feather name="user" size={14} color={theme.textSecondary} />
-            <ThemedText
-              style={[styles.detailText, { color: theme.textSecondary }]}
-              numberOfLines={1}
-            >
-              {declaration.client_name || "Client inconnu"}
-            </ThemedText>
-          </View>
-          <View style={styles.detailRow}>
-            <Feather name="hash" size={14} color={theme.textSecondary} />
-            <ThemedText
-              style={[styles.detailText, { color: theme.textSecondary }]}
-              numberOfLines={1}
-            >
-              {declaration.reference}
-            </ThemedText>
-          </View>
-        </View>
+      {/* Ligne 2: Nom produit */}
+      <ThemedText 
+        type="body" 
+        numberOfLines={1} 
+        style={[styles.productName, { color: theme.text }]}
+      >
+        {declaration.product_name}
+      </ThemedText>
+
+      {/* Ligne 3: Client */}
+      <View style={styles.infoRow}>
+        <Feather name="user" size={12} color="#FFFFFF" />
+        <ThemedText
+          style={[styles.infoText, { color: "#FFFFFF" }]}
+          numberOfLines={1}
+        >
+          {declaration.client?.name || t("unknownClient") || "Client inconnu"}
+        </ThemedText>
       </View>
 
-      {declaration.technician_name && declaration.status !== "nouvelle" ? (
-        <View style={[styles.footer, { borderTopColor: theme.border }]}>
-          <Feather name="tool" size={14} color={theme.secondary} />
+      {/* Ligne 4: Commercial */}
+      {declaration.commercial?.name && (
+        <View style={styles.infoRow}>
+          <Feather name="user-check" size={12} color={theme.primary} />
           <ThemedText
-            style={[styles.technicianText, { color: theme.secondary }]}
+            style={[styles.infoText, { color: theme.primary }]}
+            numberOfLines={1}
           >
-            {declaration.technician_name}
+            {declaration.commercial.name}
           </ThemedText>
         </View>
-      ) : null}
+      )}
+
+      {/* Ligne 5: Technicien (si présent) */}
+      {declaration.technician?.name && declaration.status !== "nouvelle" && (
+        <View style={styles.infoRow}>
+          <Feather name="tool" size={12} color={theme.secondary} />
+          <ThemedText
+            style={[styles.infoText, { color: theme.secondary }]}
+            numberOfLines={1}
+          >
+            {declaration.technician.name}
+          </ThemedText>
+        </View>
+      )}
+
+      {/* Ligne 6: Référence + S/N */}
+      <View style={styles.detailsRow}>
+        <View style={styles.detailItem}>
+          <Feather name="hash" size={10} color={theme.textSecondary} />
+          <ThemedText 
+            style={[styles.detailText, { color: theme.textSecondary }]}
+            numberOfLines={1}
+          >
+            {declaration.reference}
+          </ThemedText>
+        </View>
+        
+        <View style={styles.detailItem}>
+          <Feather name="cpu" size={10} color={theme.textSecondary} />
+          <ThemedText 
+            style={[styles.detailText, { color: theme.textSecondary }]}
+            numberOfLines={1}
+          >
+            {declaration.serial_number}
+          </ThemedText>
+        </View>
+      </View>
     </AnimatedPressable>
   );
 }
@@ -128,68 +158,45 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
 const styles = StyleSheet.create({
   card: {
     borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  header: {
+  topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  categoryBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: "500",
+    marginBottom: 4,
   },
   date: {
-    fontSize: 12,
-  },
-  content: {
-    flexDirection: "row",
-    gap: Spacing.md,
-  },
-  thumbnail: {
-    width: 64,
-    height: 64,
-    borderRadius: BorderRadius.xs,
-  },
-  info: {
-    flex: 1,
-    justifyContent: "center",
+    fontSize: 11,
+    fontWeight: "500",
   },
   productName: {
-    marginBottom: Spacing.xs,
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 4,
   },
-  detailRow: {
+  infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
-    marginTop: Spacing.xs,
+    gap: 4,
+    marginBottom: 2,
+  },
+  infoText: {
+    fontSize: 12,
+  },
+  detailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: Spacing.md,
+  },
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
   detailText: {
-    fontSize: 13,
-    flex: 1,
-  },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-  },
-  technicianText: {
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: 11,
   },
 });

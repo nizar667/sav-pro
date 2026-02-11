@@ -8,6 +8,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing } from "@/constants/theme";
 import { DeclarationCard } from "@/components/DeclarationCard";
 import { EmptyState } from "@/components/EmptyState";
@@ -20,15 +21,9 @@ import { getApiUrl } from "@/lib/query-client";
 
 type FilterStatus = "all" | DeclarationStatus;
 
-const FILTERS: { key: FilterStatus; label: string }[] = [
-  { key: "all", label: "Toutes" },
-  { key: "nouvelle", label: "Nouvelles" },
-  { key: "en_cours", label: "En cours" },
-  { key: "reglee", label: "Réglées" },
-];
-
 export default function DeclarationsScreen() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
@@ -39,6 +34,13 @@ export default function DeclarationsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>("all");
+
+  const FILTERS: { key: FilterStatus; label: string }[] = [
+    { key: "all", label: t("all") },
+    { key: "nouvelle", label: t("new") },
+    { key: "en_cours", label: t("inProgress") },
+    { key: "reglee", label: t("resolved") },
+  ];
 
   const fetchDeclarations = useCallback(async () => {
     try {
@@ -79,7 +81,7 @@ export default function DeclarationsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-        <LoadingSpinner message="Chargement des déclarations..." />
+        <LoadingSpinner message={t("loadingDeclarations")} />
       </View>
     );
   }
@@ -142,11 +144,11 @@ export default function DeclarationsScreen() {
         ListEmptyComponent={
           <EmptyState
             image={require("../../assets/images/empty-declarations.png")}
-            title="Aucune déclaration"
+            title={t("noDeclarations")}
             message={
               isCommercial
-                ? "Appuyez sur + pour créer votre première déclaration"
-                : "Les déclarations des commerciaux apparaîtront ici"
+                ? t("emptyDeclarationsMessage")
+                : t("declarationsWillAppear")
             }
           />
         }
