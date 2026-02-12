@@ -1005,15 +1005,15 @@ app.post("/api/upload", authMiddleware, async (req: AuthRequest, res) => {
 
 // ================ DÉMARRAGE ================
 app.listen(port, "0.0.0.0", () => {
+  const publicUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` 
+    : `http://localhost:${port}`;
+
   console.log("=".repeat(60));
-  console.log("🚀 BACKEND SAV PRO - VERSION CORRIGÉE");
+  console.log("🚀 BACKEND SAV PRO - DÉPLOYÉ SUR RAILWAY");
   console.log("=".repeat(60));
-  console.log(`📍 http://192.168.1.87:${port}`);
-  console.log("=".repeat(60));
-  console.log("🔧 MODIFICATIONS APPLIQUÉES :");
-  console.log("  • Clients: Filtrés par commercial");
-  console.log("  • Déclarations: Référence et S/N optionnels");
-  console.log("  • Remarques technicien: Visibles par commercial");
+  console.log(`📍 URL publique : ${publicUrl}`);
+  console.log(`📍 Port interne : ${port}`);
   console.log("=".repeat(60));
   console.log("🔐 COMPTES DISPONIBLES :");
   console.log("  Admin:      admin@sav.com      / admin123");
