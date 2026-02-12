@@ -1,0 +1,10 @@
+{
+  "android": {
+    "package": "com.nizarkroim.savproclient"
+  },
+  "extra": {
+    "eas": {
+      "projectId": "fd703b98-dd9e-427a-aa5a-b1488d9e0781"
+    }
+  }
+}

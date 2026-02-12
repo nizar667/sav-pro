@@ -370,8 +370,7 @@ export default function AllUsersScreen() {
         {/* LISTE DES UTILISATEURS */}
         {filteredUsers.length === 0 ? (
           <EmptyState
-            image={require("../../assets/images/icon.png")}
-            title="Aucun utilisateur trouvé"
+image={require("@/assets/images/icon.png")}            title="Aucun utilisateur trouvé"
             message="Ajustez vos filtres ou créez un nouvel utilisateur."
           />
         ) : (

@@ -1,5 +1,9 @@
 import { registerRootComponent } from "expo";
 
-import App from "@/App";
+// Remplacez cette ligne :
+// import App from "@/App";
+
+// Par celle-ci (chemin relatif) :
+import App from "./App";
 
 registerRootComponent(App);

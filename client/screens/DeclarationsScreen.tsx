@@ -143,8 +143,7 @@ export default function DeclarationsScreen() {
         }
         ListEmptyComponent={
           <EmptyState
-            image={require("../../assets/images/empty-declarations.png")}
-            title={t("noDeclarations")}
+source={require("../assets/images/icon.png")}            title={t("noDeclarations")}
             message={
               isCommercial
                 ? t("emptyDeclarationsMessage")

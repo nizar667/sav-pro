@@ -100,8 +100,7 @@ export default function ClientsScreen() {
         }
         ListEmptyComponent={
           <EmptyState
-            image={require("../../assets/images/empty-clients.png")}
-            title={t("noClients")}
+source={require("../assets/images/icon.png")}            title={t("noClients")}
             message={t("emptyClientsMessage")}
           />
         }

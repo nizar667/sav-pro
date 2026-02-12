@@ -19,7 +19,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.savpro.app"
+      "package": "com.savpro.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "output": "single",
@@ -50,6 +54,11 @@
     ],
     "experiments": {
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c771a835-26e2-4dcc-92c6-75e747095a61"
+      }
     }
   }
 }

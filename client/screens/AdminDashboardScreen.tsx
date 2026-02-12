@@ -303,8 +303,7 @@ export default function AdminDashboardScreen() {
 
         {pendingUsers.length === 0 ? (
           <EmptyState
-            image={require("../../assets/images/icon.png")}
-            title="Aucune demande en attente"
+source={require("../assets/images/icon.png")}            title="Aucune demande en attente"
             message="Toutes les demandes ont été traitées."
           />
         ) : (
