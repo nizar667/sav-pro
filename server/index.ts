@@ -388,7 +388,6 @@ app.get("/api/categories", async (req, res) => {
 
 // ================ CLIENTS ================
 
-// MODIFIÉ: Les commerciaux voient seulement leurs clients
 app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
   try {
     let query = supabase
@@ -398,7 +397,6 @@ app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
         commercial:users!clients_commercial_id_fkey(id, name, email)
       `);
 
-    // MODIFIÉ: Filtrer par commercial_id si l'utilisateur est un commercial
     if (req.user?.role === "commercial") {
       query = query.eq("commercial_id", req.user.id);
     } else if (req.user?.role === "admin") {
@@ -427,12 +425,10 @@ app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-// MODIFIÉ: Seulement le nom est obligatoire, email et phone optionnels
 app.post("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { name, email, phone, address } = req.body;
     
-    // MODIFIÉ: Seulement le nom est requis
     if (!name) {
       return res.status(400).json({ 
         success: false,
@@ -574,6 +570,7 @@ app.get("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
         created_at,
         taken_at,
         resolved_at,
+        completed_at,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -633,6 +630,7 @@ app.get("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res) =
         created_at,
         taken_at,
         resolved_at,
+        completed_at,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -659,7 +657,6 @@ app.get("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res) =
 });
 
 // ================ CREATE DECLARATION ================
-// MODIFIÉ: Référence et numéro de série optionnels
 app.post("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
   try {
     console.log("📋 POST /api/declarations - User:", req.user?.email);
@@ -674,7 +671,6 @@ app.post("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
       accessories 
     } = req.body;
 
-    // MODIFIÉ: Seuls category_id, client_id et product_name sont requis
     if (!category_id || !client_id || !product_name) {
       return res.status(400).json({ 
         success: false,
@@ -713,6 +709,7 @@ app.post("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
         created_at,
         taken_at,
         resolved_at,
+        completed_at,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -801,7 +798,6 @@ app.put("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res) =
   }
 });
 
-// MODIFIÉ: Suppression possible pour tous les statuts
 app.delete("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -816,7 +812,6 @@ app.delete("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res
       return res.status(404).json({ message: "Déclaration non trouvée" });
     }
 
-    // MODIFIÉ: Vérifier seulement l'appartenance, pas le statut
     if (existing.commercial_id !== req.user?.id) {
       return res.status(403).json({ message: "Non autorisé" });
     }
@@ -869,6 +864,7 @@ app.post("/api/declarations/:id/take", authMiddleware, async (req: AuthRequest, 
         created_at,
         taken_at,
         resolved_at,
+        completed_at,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -929,6 +925,7 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
         created_at,
         taken_at,
         resolved_at,
+        completed_at,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -950,6 +947,50 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
   } catch (error) {
     console.error("Resolve declaration error:", error);
     res.status(500).json({ message: "Erreur résolution" });
+  }
+});
+
+// ================ NOUVELLE ROUTE POUR "SORTIE" ================
+app.post("/api/declarations/:id/complete", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const user_id = req.user?.id;
+    
+    if (!user_id) {
+      return res.status(401).json({ message: "Non authentifié" });
+    }
+
+    const { data: declaration, error } = await supabase
+      .from("declarations")
+      .update({
+        status: "sortie",
+        completed_at: new Date().toISOString()
+      })
+      .eq("id", id)
+      .eq("technician_id", user_id)
+      .eq("status", "reglee")
+      .select(`
+        *,
+        client:clients(*),
+        category:categories(*),
+        commercial:users!declarations_commercial_id_fkey(id, name, email),
+        technician:users!declarations_technician_id_fkey(id, name, email)
+      `)
+      .single();
+
+    if (error) throw error;
+    
+    if (!declaration) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Déclaration non trouvée ou déjà sortie" 
+      });
+    }
+
+    res.json(declaration);
+  } catch (error) {
+    console.error("Complete declaration error:", error);
+    res.status(500).json({ message: "Erreur lors du passage en sortie" });
   }
 });
 
