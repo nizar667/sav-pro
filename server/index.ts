@@ -571,6 +571,7 @@ app.get("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
         taken_at,
         resolved_at,
         completed_at,
+        completed_by,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -631,6 +632,7 @@ app.get("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res) =
         taken_at,
         resolved_at,
         completed_at,
+        completed_by,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -710,6 +712,7 @@ app.post("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
         taken_at,
         resolved_at,
         completed_at,
+        completed_by,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -865,6 +868,7 @@ app.post("/api/declarations/:id/take", authMiddleware, async (req: AuthRequest, 
         taken_at,
         resolved_at,
         completed_at,
+        completed_by,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -926,6 +930,7 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
         taken_at,
         resolved_at,
         completed_at,
+        completed_by,
         commercial_id,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
@@ -950,21 +955,30 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
   }
 });
 
-// ================ NOUVELLE ROUTE POUR "SORTIE" ================
+// ================ ROUTE POUR "SORTIE" AVEC COMPLETED_BY ================
 app.post("/api/declarations/:id/complete", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const { completed_by } = req.body;
     const user_id = req.user?.id;
     
     if (!user_id) {
       return res.status(401).json({ message: "Non authentifié" });
     }
 
+    if (!completed_by || completed_by.trim() === "") {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Le nom de la personne qui sort le produit est requis" 
+      });
+    }
+
     const { data: declaration, error } = await supabase
       .from("declarations")
       .update({
         status: "sortie",
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
+        completed_by: completed_by.trim()
       })
       .eq("id", id)
       .eq("technician_id", user_id)
