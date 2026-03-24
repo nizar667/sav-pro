@@ -57,7 +57,6 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
     }
   };
 
-  // ✅ Fonction pour déterminer la couleur de la bordure gauche
   const getBorderColor = () => {
     switch (declaration.status) {
       case "nouvelle":
@@ -67,13 +66,12 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
       case "reglee":
         return theme.success;
       case "sortie":
-        return "#9C27B0"; // Violet
+        return "#9C27B0";
       default:
         return theme.border;
     }
   };
 
-  // ✅ Vérifier si des accessoires sont cochés
   const hasCheckedAccessories = declaration.accessories?.some(item => item.checked) || false;
 
   return (
@@ -122,7 +120,7 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
           style={[styles.infoText, { color: "#FFFFFF" }]}
           numberOfLines={1}
         >
-          {declaration.client?.name || t("unknownClient") || "Client inconnu"}
+          {declaration.client?.name || "Client inconnu"}
         </ThemedText>
       </View>
 
@@ -160,7 +158,7 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
             style={[styles.detailText, { color: theme.textSecondary }]}
             numberOfLines={1}
           >
-            {declaration.reference}
+            {declaration.reference || "—"}
           </ThemedText>
         </View>
         
@@ -170,7 +168,7 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
             style={[styles.detailText, { color: theme.textSecondary }]}
             numberOfLines={1}
           >
-            {declaration.serial_number}
+            {declaration.serial_number || "—"}
           </ThemedText>
         </View>
       </View>

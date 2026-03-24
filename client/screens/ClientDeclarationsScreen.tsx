@@ -1,131 +1,83 @@
-import React, { useState, useCallback } from "react";
-import { FlatList, RefreshControl, View, StyleSheet } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, FlatList, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation, useFocusEffect, useRoute } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRoute, useNavigation } from "@react-navigation/native";
+import { ThemedText } from "@/components/ThemedText";
+import { DeclarationCard } from "@/components/DeclarationCard";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { EmptyState } from "@/components/EmptyState";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing } from "@/constants/theme";
-import { DeclarationCard } from "@/components/DeclarationCard";
-import { EmptyState } from "@/components/EmptyState";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { ThemedText } from "@/components/ThemedText";
 import { Declaration } from "@/types";
-import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { getApiUrl } from "@/lib/query-client";
-
-type RouteParams = {
-  clientId: string;
-  clientName: string;
-};
 
 export default function ClientDeclarationsScreen() {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const route = useRoute();
+  const navigation = useNavigation();
+  const { token } = useAuth();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const route = useRoute();
-  const { token } = useAuth();
-
-  // ✅ Sécurise la récupération des paramètres
-  const params = route.params as RouteParams;
-  const clientId = params?.clientId;
-  const clientName = params?.clientName;
-
+  const params = route.params as { clientId: string; clientName: string };
   const [declarations, setDeclarations] = useState<Declaration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const fetchDeclarations = useCallback(async () => {
-    if (!clientId) return;
-    
-    try {
-      const baseUrl = getApiUrl();
-      const response = await fetch(new URL("/api/declarations", baseUrl).href, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (response.ok) {
+  useEffect(() => {
+    const fetchDeclarations = async () => {
+      try {
+        const baseUrl = getApiUrl();
+        const response = await fetch(new URL("/api/declarations", baseUrl).href, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const data = await response.json();
-        const filtered = data.filter((d: Declaration) => d.client_id === clientId);
+        const filtered = data.filter((d: Declaration) => d.client_id === params.clientId);
         setDeclarations(filtered);
+      } catch (error) {
+        console.error("Erreur chargement déclarations:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to fetch declarations:", error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [token, clientId]);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchDeclarations();
-    }, [fetchDeclarations])
-  );
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
+    };
     fetchDeclarations();
-  };
+  }, [params.clientId, token]);
 
-  // ✅ Si pas de clientId, afficher un message d'erreur
-  if (!clientId) {
+  if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.backgroundRoot, justifyContent: "center", alignItems: "center" }]}>
-        <ThemedText>Erreur : client non trouvé</ThemedText>
-      </View>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <View style={{ flex: 1, backgroundColor: theme.backgroundRoot }}>
         <LoadingSpinner message="Chargement des déclarations..." />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <View style={{ flex: 1, backgroundColor: theme.backgroundRoot }}>
       <FlatList
-        style={styles.list}
         contentContainerStyle={[
           styles.listContent,
           {
-            paddingTop: headerHeight + Spacing.md,
+            paddingTop: headerHeight + Spacing.lg,
             paddingBottom: tabBarHeight + Spacing.xl,
           },
         ]}
-        scrollIndicatorInsets={{ bottom: insets.bottom }}
         data={declarations}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <DeclarationCard
             declaration={item}
-            onPress={() => navigation.navigate("DeclarationDetail", { declaration: item })}
+            onPress={() => navigation.navigate("DeclarationDetail", { 
+              declarationId: item.id 
+            })}
           />
         )}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.primary}
-            progressViewOffset={headerHeight}
-          />
-        }
         ListHeaderComponent={
           <View style={styles.header}>
-            <ThemedText type="h3" style={styles.title}>
-              Déclarations de {clientName}
-            </ThemedText>
+            <ThemedText type="h3">Déclarations de {params.clientName}</ThemedText>
             <ThemedText style={[styles.count, { color: theme.textSecondary }]}>
-              {declarations.length} déclaration(s)
+              {declarations.length} déclaration{declarations.length > 1 ? "s" : ""}
             </ThemedText>
           </View>
         }
@@ -133,7 +85,7 @@ export default function ClientDeclarationsScreen() {
           <EmptyState
             source={require("../assets/images/icon.png")}
             title="Aucune déclaration"
-            message={`Aucune déclaration trouvée pour ${clientName}`}
+            message={`Aucune déclaration trouvée pour ${params.clientName}`}
           />
         }
       />
@@ -142,24 +94,18 @@ export default function ClientDeclarationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  list: {
-    flex: 1,
-  },
   listContent: {
     paddingHorizontal: Spacing.lg,
     flexGrow: 1,
   },
   header: {
-    marginTop: Spacing.md,
     marginBottom: Spacing.lg,
-  },
-  title: {
-    marginBottom: Spacing.xs,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.1)",
   },
   count: {
     fontSize: 14,
+    marginTop: 4,
   },
 });

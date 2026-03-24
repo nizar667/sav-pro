@@ -388,8 +388,6 @@ app.get("/api/categories", async (req, res) => {
 
 // ================ CLIENTS ================
 
-// ================ CLIENTS ================
-
 app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
   try {
     let query = supabase
@@ -399,16 +397,8 @@ app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
         commercial:users!clients_commercial_id_fkey(id, name, email)
       `);
 
-    // ✅ MODIFICATION : Les techniciens voient TOUS les clients
     if (req.user?.role === "commercial") {
       query = query.eq("commercial_id", req.user.id);
-    } else if (req.user?.role === "technicien") {
-      // Les techniciens voient tous les clients (pas de filtre)
-      // Rien à ajouter ici
-    } else if (req.user?.role === "admin") {
-      // Les admins voient tous les clients
-    } else {
-      return res.status(403).json({ message: "Rôle non autorisé" });
     }
 
     query = query.order("name");
@@ -430,6 +420,7 @@ app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
     });
   }
 });
+
 app.post("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { name, email, phone, address } = req.body;
@@ -586,12 +577,6 @@ app.get("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
 
     if (req.user?.role === "commercial") {
       query = query.eq("commercial_id", req.user.id);
-    } else if (req.user?.role === "technicien") {
-      // Pas de filtre
-    } else if (req.user?.role === "admin") {
-      // Pas de filtre
-    } else {
-      return res.status(403).json({ message: "Rôle non autorisé" });
     }
 
     query = query.order("created_at", { ascending: false });
@@ -908,14 +893,12 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
       return res.status(401).json({ message: "Utilisateur non authentifié" });
     }
 
-    // ✅ Récupère la déclaration existante pour conserver la remarque
     const { data: existing } = await supabase
       .from("declarations")
       .select("technician_remarks")
       .eq("id", id)
       .single();
 
-    // Si aucune remarque n'est envoyée, on garde l'ancienne
     const finalRemarks = remarks !== undefined && remarks !== "" 
       ? remarks 
       : (existing?.technician_remarks || "");
@@ -971,7 +954,7 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
     res.status(500).json({ message: "Erreur résolution" });
   }
 });
-// ================ ROUTE POUR "SORTIE" AVEC COMPLETED_BY ================
+
 app.post("/api/declarations/:id/complete", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -1062,8 +1045,6 @@ app.patch("/api/declarations/:id/remarks", authMiddleware, async (req: AuthReque
 // ================ UPLOAD ================
 app.post("/api/upload", authMiddleware, async (req: AuthRequest, res) => {
   try {
-    // Cette route doit gérer FormData, pas JSON
-    // Pour simplifier, retournons une URL fictive
     res.json({
       success: true,
       url: "https://example.com/uploaded-photo.jpg"
