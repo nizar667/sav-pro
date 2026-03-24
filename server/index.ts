@@ -388,6 +388,8 @@ app.get("/api/categories", async (req, res) => {
 
 // ================ CLIENTS ================
 
+// ================ CLIENTS ================
+
 app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
   try {
     let query = supabase
@@ -397,8 +399,12 @@ app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
         commercial:users!clients_commercial_id_fkey(id, name, email)
       `);
 
+    // ✅ MODIFICATION : Les techniciens voient TOUS les clients
     if (req.user?.role === "commercial") {
       query = query.eq("commercial_id", req.user.id);
+    } else if (req.user?.role === "technicien") {
+      // Les techniciens voient tous les clients (pas de filtre)
+      // Rien à ajouter ici
     } else if (req.user?.role === "admin") {
       // Les admins voient tous les clients
     } else {
@@ -424,7 +430,6 @@ app.get("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
     });
   }
 });
-
 app.post("/api/clients", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { name, email, phone, address } = req.body;

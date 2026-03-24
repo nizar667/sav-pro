@@ -1,5 +1,5 @@
 // types/index.ts - CORRIGÉ
-export type DeclarationStatus = "nouvelle" | "en_cours" | "reglee";
+export type DeclarationStatus = "nouvelle" | "en_cours" | "reglee" | "sortie";
 
 export interface Category {
   id: string;
@@ -61,6 +61,8 @@ export interface Declaration {
   created_at: string;
   taken_at?: string;
   resolved_at?: string;
+  completed_at?: string; // NOUVEAU : date de sortie
+  completed_by?: string; // ← NOUVEAU : nom de la personne qui a sorti
 }
 
 // NOUVELLES CATÉGORIES - CORRESPONDANT À VOTRE SUPABASE
@@ -75,7 +77,7 @@ export const CATEGORIES: Category[] = [
   { id: "8", name: "Réfrigérateur & Congélateur" },
   { id: "9", name: "Télévision" },
   { id: "10", name: "Vélos Électriques" },
-  { id: "11", name: "Autres" }, // <-- AJOUTÉ
+  { id: "11", name: "Autres" },
 ];
 
 export const DEFAULT_ACCESSORIES: string[] = [

@@ -7,7 +7,7 @@ import DeclarationsStackNavigator from "@/navigation/DeclarationsStackNavigator"
 import ClientsStackNavigator from "@/navigation/ClientsStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import AdminDashboardScreen from "@/screens/AdminDashboardScreen";
-import IDEntryScreen from "@/screens/IDEntryScreen"; // IMPORT NOUVEAU
+import IDEntryScreen from "@/screens/IDEntryScreen";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -16,7 +16,7 @@ export type MainTabParamList = {
   ClientsTab: undefined;
   ProfileTab: undefined;
   AdminTab: undefined;
-  IDEntryTab: undefined; // NOUVEAU
+  IDEntryTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -67,8 +67,8 @@ export default function MainTabNavigator() {
         }}
       />
       
-      {/* ONGLET CLIENTS - Seulement pour commerciaux */}
-      {isCommercial ? (
+      {/* ONGLET CLIENTS - Pour commerciaux ET techniciens */}
+      {(isCommercial || isTechnician) ? (
         <Tab.Screen
           name="ClientsTab"
           component={ClientsStackNavigator}
@@ -124,6 +124,4 @@ export default function MainTabNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
-  // Styles si nécessaires
-});
+const styles = StyleSheet.create({});

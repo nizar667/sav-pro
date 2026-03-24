@@ -57,6 +57,25 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
     }
   };
 
+  // ✅ Fonction pour déterminer la couleur de la bordure gauche
+  const getBorderColor = () => {
+    switch (declaration.status) {
+      case "nouvelle":
+        return theme.primary;
+      case "en_cours":
+        return theme.warning;
+      case "reglee":
+        return theme.success;
+      case "sortie":
+        return "#9C27B0"; // Violet
+      default:
+        return theme.border;
+    }
+  };
+
+  // ✅ Vérifier si des accessoires sont cochés
+  const hasCheckedAccessories = declaration.accessories?.some(item => item.checked) || false;
+
   return (
     <AnimatedPressable
       style={[
@@ -64,10 +83,7 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
         { 
           backgroundColor: theme.backgroundDefault,
           borderLeftWidth: 3,
-          borderLeftColor: 
-            declaration.status === "nouvelle" ? theme.primary :
-            declaration.status === "en_cours" ? theme.warning :
-            theme.success,
+          borderLeftColor: getBorderColor(),
         },
         animatedStyle,
       ]}
@@ -75,12 +91,19 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
     >
-      {/* Ligne 1: Statut + Date */}
+      {/* Ligne 1: Statut + Date + Indicateur accessoires */}
       <View style={styles.topRow}>
         <StatusBadge status={declaration.status} size="small" />
-        <ThemedText style={[styles.date, { color: "#FFFFFF" }]}>
-          {formatDate(declaration.created_at)}
-        </ThemedText>
+        <View style={styles.rightContainer}>
+          {hasCheckedAccessories && (
+            <View style={[styles.accessoryIndicator, { backgroundColor: theme.secondary }]}>
+              <Feather name="package" size={8} color="#FFFFFF" />
+            </View>
+          )}
+          <ThemedText style={[styles.date, { color: "#FFFFFF" }]}>
+            {formatDate(declaration.created_at)}
+          </ThemedText>
+        </View>
       </View>
 
       {/* Ligne 2: Nom produit */}
@@ -166,6 +189,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 4,
+  },
+  rightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  accessoryIndicator: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   date: {
     fontSize: 11,

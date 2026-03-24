@@ -5,8 +5,12 @@ import { Platform } from "react-native";
  * Gets the base URL for the Express API server
  */
 export function getApiUrl(): string {
-  // TOUJOURS utiliser l'IP du PC pour tous les devices
-  return "http://192.168.1.87:8080";
+  // En développement (Expo Go sur PC)
+  if (__DEV__) {
+    return "http://192.168.1.87:8080";
+  }
+  // En production (APK sur téléphone) - Ancienne URL Railway
+  return "https://sav-pro-production.up.railway.app";
 }
 
 async function throwIfResNotOk(res: Response) {

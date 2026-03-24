@@ -8,20 +8,19 @@ import Animated, {
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-// import { useLanguage } from "@/contexts/LanguageContext"; // RETIREZ SI NON UTILISÉ
 import { BorderRadius, Spacing, Shadows } from "@/constants/theme";
 import { Client } from "@/types";
 
 interface ClientCardProps {
   client: Client;
   onPress: () => void;
+  showCommercial?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function ClientCard({ client, onPress }: ClientCardProps) {
+export function ClientCard({ client, onPress, showCommercial }: ClientCardProps) {
   const { theme } = useTheme();
-  // const { t } = useLanguage(); // RETIREZ SI VOUS NE L'UTILISEZ PAS
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -57,6 +56,19 @@ export function ClientCard({ client, onPress }: ClientCardProps) {
         <ThemedText type="h4" numberOfLines={1}>
           {client.name}
         </ThemedText>
+        
+        {showCommercial && client.commercial?.name && (
+          <View style={styles.detailRow}>
+            <Feather name="user-check" size={14} color={theme.primary} />
+            <ThemedText
+              style={[styles.detailText, { color: theme.primary }]}
+              numberOfLines={1}
+            >
+              {client.commercial.name}
+            </ThemedText>
+          </View>
+        )}
+
         <View style={styles.detailRow}>
           <Feather name="mail" size={14} color={theme.textSecondary} />
           <ThemedText

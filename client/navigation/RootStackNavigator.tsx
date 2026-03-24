@@ -4,10 +4,11 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
 import MainTabNavigator from "./MainTabNavigator";
 import AuthStackNavigator from "./AuthStackNavigator";
-import DeclarationDetailScreen from "../screens/DeclarationDetailScreen"; // ← Chemin relatif CORRECT
+import DeclarationDetailScreen from "../screens/DeclarationDetailScreen";
 import NewDeclarationScreen from "../screens/NewDeclarationScreen";
 import NewClientScreen from "../screens/NewClientScreen";
 import ClientDetailScreen from "../screens/ClientDetailScreen";
+import ClientDeclarationsScreen from "../screens/ClientDeclarationsScreen"; // NOUVEAU
 import AllUsersScreen from "../screens/AllUsersScreen";
 import { useScreenOptions } from "../hooks/useScreenOptions";
 import { useAuth } from "../contexts/AuthContext";
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   NewDeclaration: undefined;
   NewClient: undefined;
   ClientDetail: { client: Client };
+  ClientDeclarations: { clientId: string; clientName: string }; // NOUVEAU
   AllUsers: undefined;
 };
 
@@ -73,6 +75,11 @@ export default function RootStackNavigator() {
             name="ClientDetail"
             component={ClientDetailScreen}
             options={{ headerTitle: "Client" }}
+          />
+          <Stack.Screen
+            name="ClientDeclarations"
+            component={ClientDeclarationsScreen}
+            options={{ headerTitle: "Déclarations client" }}
           />
           <Stack.Screen
             name="AllUsers"

@@ -3,80 +3,75 @@ import { FlatList, RefreshControl, View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation, useFocusEffect, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing } from "@/constants/theme";
-import { ClientCard } from "@/components/ClientCard";
+import { DeclarationCard } from "@/components/DeclarationCard";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { FAB } from "@/components/FAB";
-import { Client } from "@/types";
+import { ThemedText } from "@/components/ThemedText";
+import { Declaration } from "@/types";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { getApiUrl } from "@/lib/query-client";
 
-export default function ClientsScreen() {
+type RouteParams = {
+  clientId: string;
+  clientName: string;
+};
+
+export default function ClientDeclarationsScreen() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { token, user } = useAuth();
-  const { t } = useLanguage();
+  const route = useRoute();
+  const { clientId, clientName } = route.params as RouteParams;
+  const { token } = useAuth();
 
-  const [clients, setClients] = useState<Client[]>([]);
+  const [declarations, setDeclarations] = useState<Declaration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const isCommercial = user?.role === "commercial";
-  const isTechnician = user?.role === "technicien";
-
-  const fetchClients = useCallback(async () => {
+  const fetchDeclarations = useCallback(async () => {
     try {
       const baseUrl = getApiUrl();
-      const response = await fetch(new URL("/api/clients", baseUrl).href, {
+      const response = await fetch(new URL("/api/declarations", baseUrl).href, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
+      
       if (response.ok) {
         const data = await response.json();
-        setClients(data);
-      } else {
-        console.error("Failed to fetch clients:", response.status);
+        const filtered = data.filter((d: Declaration) => d.client_id === clientId);
+        setDeclarations(filtered);
       }
     } catch (error) {
-      console.error("Failed to fetch clients:", error);
+      console.error("Failed to fetch declarations:", error);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [token]);
+  }, [token, clientId]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchClients();
-    }, [fetchClients])
+      fetchDeclarations();
+    }, [fetchDeclarations])
   );
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    fetchClients();
-  };
-
-  const handleClientPress = (client: Client) => {
-    if (isTechnician) {
-      navigation.navigate("ClientDeclarations", { clientId: client.id, clientName: client.name });
-    } else {
-      navigation.navigate("ClientDetail", { client });
-    }
+    fetchDeclarations();
   };
 
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-        <LoadingSpinner message={t("loadingClients")} />
+        <LoadingSpinner message="Chargement des déclarations..." />
       </View>
     );
   }
@@ -88,18 +83,17 @@ export default function ClientsScreen() {
         contentContainerStyle={[
           styles.listContent,
           {
-            paddingTop: headerHeight + Spacing.xl,
+            paddingTop: headerHeight + Spacing.md,
             paddingBottom: tabBarHeight + Spacing.xl,
           },
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
-        data={clients}
+        data={declarations}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ClientCard
-            client={item}
-            onPress={() => handleClientPress(item)}
-            showCommercial={isTechnician}
+          <DeclarationCard
+            declaration={item}
+            onPress={() => navigation.navigate("DeclarationDetail", { declaration: item })}
           />
         )}
         refreshControl={
@@ -110,22 +104,24 @@ export default function ClientsScreen() {
             progressViewOffset={headerHeight}
           />
         }
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <ThemedText type="h3" style={styles.title}>
+              Déclarations de {clientName}
+            </ThemedText>
+            <ThemedText style={[styles.count, { color: theme.textSecondary }]}>
+              {declarations.length} déclaration(s)
+            </ThemedText>
+          </View>
+        }
         ListEmptyComponent={
           <EmptyState
             source={require("../assets/images/icon.png")}
-            title={t("noClients")}
-            message={t("emptyClientsMessage")}
+            title="Aucune déclaration"
+            message={`Aucune déclaration trouvée pour ${clientName}`}
           />
         }
       />
-
-      {isCommercial && (
-        <FAB
-          onPress={() => navigation.navigate("NewClient")}
-          icon="user-plus"
-          bottom={tabBarHeight + Spacing.lg}
-        />
-      )}
     </View>
   );
 }
@@ -140,5 +136,15 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: Spacing.lg,
     flexGrow: 1,
+  },
+  header: {
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  title: {
+    marginBottom: Spacing.xs,
+  },
+  count: {
+    fontSize: 14,
   },
 });
