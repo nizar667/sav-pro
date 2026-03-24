@@ -908,11 +908,23 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
       return res.status(401).json({ message: "Utilisateur non authentifié" });
     }
 
+    // ✅ Récupère la déclaration existante pour conserver la remarque
+    const { data: existing } = await supabase
+      .from("declarations")
+      .select("technician_remarks")
+      .eq("id", id)
+      .single();
+
+    // Si aucune remarque n'est envoyée, on garde l'ancienne
+    const finalRemarks = remarks !== undefined && remarks !== "" 
+      ? remarks 
+      : (existing?.technician_remarks || "");
+
     const { data: declaration, error } = await supabase
       .from("declarations")
       .update({
         status: "reglee",
-        technician_remarks: remarks,
+        technician_remarks: finalRemarks,
         resolved_at: new Date().toISOString()
       })
       .eq("id", id)
@@ -959,7 +971,6 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
     res.status(500).json({ message: "Erreur résolution" });
   }
 });
-
 // ================ ROUTE POUR "SORTIE" AVEC COMPLETED_BY ================
 app.post("/api/declarations/:id/complete", authMiddleware, async (req: AuthRequest, res) => {
   try {

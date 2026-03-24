@@ -49,6 +49,8 @@ export default function DeclarationDetailScreen() {
   const [isEditingRemarks, setIsEditingRemarks] = useState(false);
   const [technicianRemarks, setTechnicianRemarks] = useState("");
   const [isSavingRemarks, setIsSavingRemarks] = useState(false);
+  const [showNameInput, setShowNameInput] = useState(false);
+  const [exitName, setExitName] = useState("");
 
   useEffect(() => {
     if (!route.params?.declaration && token) {
@@ -104,12 +106,17 @@ export default function DeclarationDetailScreen() {
     isTechnician &&
     declaration?.status === "en_cours" &&
     declaration.technician_id === user?.id;
+  const canComplete = 
+    isTechnician &&
+    declaration?.status === "reglee" &&
+    declaration.technician_id === user?.id;
   const canDelete =
     isCommercial &&
     declaration?.commercial_id === user?.id &&
     (declaration.status === "nouvelle" || 
      declaration.status === "en_cours" || 
-     declaration.status === "reglee");
+     declaration.status === "reglee" ||
+     declaration.status === "sortie");
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
@@ -155,6 +162,9 @@ export default function DeclarationDetailScreen() {
         setDeclaration(updatedDeclaration);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(t("success"), t("declarationTaken"));
+        
+        // ✅ IMPRESSION AUTOMATIQUE POUR LE TECHNICIEN
+        handlePrintTicket();
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || t("takeChargeFailed"));
@@ -168,135 +178,52 @@ export default function DeclarationDetailScreen() {
   };
 
   const handleResolve = async () => {
-    if (!declaration || !token) return;
+  if (!declaration || !token) return;
 
-    Alert.alert(
-      t("confirm"),
-      t("confirmResolve"),
-      [
-        { text: t("cancel"), style: "cancel" },
-        {
-          text: t("confirm"),
-          onPress: async () => {
-            setIsLoading(true);
-            try {
-              const baseUrl = getApiUrl();
-              const response = await fetch(
-                new URL(`/api/declarations/${declaration.id}/resolve`, baseUrl)
-                  .href,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({ remarks: "" }),
-                }
-              );
-
-              if (response.ok) {
-                const updatedDeclaration = await response.json();
-                setDeclaration(updatedDeclaration);
-                Haptics.notificationAsync(
-                  Haptics.NotificationFeedbackType.Success
-                );
-                Alert.alert(t("success"), t("declarationResolved"));
-              } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || t("resolveFailed"));
+  Alert.alert(
+    t("confirm"),
+    t("confirmResolve"),
+    [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("confirm"),
+        onPress: async () => {
+          setIsLoading(true);
+          try {
+            const baseUrl = getApiUrl();
+            const response = await fetch(
+              new URL(`/api/declarations/${declaration.id}/resolve`, baseUrl).href,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                // ✅ Envoie la remarque existante pour la conserver
+                body: JSON.stringify({ remarks: declaration.technician_remarks }),
               }
-            } catch (error: any) {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              Alert.alert(t("error"), error.message);
-            } finally {
-              setIsLoading(false);
+            );
+
+            if (response.ok) {
+              const updatedDeclaration = await response.json();
+              setDeclaration(updatedDeclaration);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert(t("success"), t("declarationResolved"));
+            } else {
+              const errorData = await response.json();
+              throw new Error(errorData.message || t("resolveFailed"));
             }
-          },
+          } catch (error: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert(t("error"), error.message);
+          } finally {
+            setIsLoading(false);
+          }
         },
-      ]
-    );
-  };
-
-  const handleSaveRemarks = async () => {
-    if (!declaration || !token) return;
-    
-    setIsSavingRemarks(true);
-    try {
-      const baseUrl = getApiUrl();
-      const response = await fetch(
-        new URL(`/api/declarations/${declaration.id}/remarks`, baseUrl).href,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ technician_remarks: technicianRemarks }),
-        }
-      );
-
-      if (response.ok) {
-        const updatedDeclaration = await response.json();
-        setDeclaration(updatedDeclaration);
-        setIsEditingRemarks(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert("Succès", "Remarques enregistrées");
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erreur enregistrement");
-      }
-    } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Erreur", error.message);
-    } finally {
-      setIsSavingRemarks(false);
-    }
-  };
-
-  const handleDelete = () => {
-    if (!declaration || !token) return;
-
-    Alert.alert(
-      t("delete"),
-      t("confirmDelete"),
-      [
-        { text: t("cancel"), style: "cancel" },
-        {
-          text: t("delete"),
-          style: "destructive",
-          onPress: async () => {
-            setIsLoading(true);
-            try {
-              const baseUrl = getApiUrl();
-              const response = await fetch(
-                new URL(`/api/declarations/${declaration.id}`, baseUrl).href,
-                {
-                  method: "DELETE",
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              );
-
-              if (response.ok) {
-                Haptics.notificationAsync(
-                  Haptics.NotificationFeedbackType.Success
-                );
-                Alert.alert(t("success"), t("declarationDeleted"));
-                navigation.goBack();
-              } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || t("deleteFailed"));
-              }
-            } catch (error: any) {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              Alert.alert(t("error"), error.message);
-            } finally {
-              setIsLoading(false);
-            }
-          },
-        },
-      ]
-    );
-  };
+      },
+    ]
+  );
+};
 
   const handleGenerateTicket = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -309,166 +236,153 @@ export default function DeclarationDetailScreen() {
 
   const handlePrintTicket = async () => {
     if (!declaration) return;
-    
+
     setIsPrinting(true);
+
     try {
       const simplifiedID = declaration.id.substring(0, 8).toUpperCase();
-      
+
       const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                padding: 20px;
-                max-width: 400px;
-                margin: 0 auto;
-              }
-              .header {
-                text-align: center;
-                margin-bottom: 20px;
-                border-bottom: 3px solid #E63946;
-                padding-bottom: 15px;
-              }
-              .company-name {
-                font-size: 24px;
-                font-weight: bold;
-                color: #E63946;
-                margin-bottom: 5px;
-              }
-              .company-subtitle {
-                font-size: 14px;
-                color: #666;
-              }
-              .id-display {
-                font-size: 42px;
-                font-weight: bold;
-                text-align: center;
-                margin: 30px 0;
-                letter-spacing: 3px;
-                color: #E63946;
-                background-color: #f8f9fa;
-                padding: 20px;
-                border-radius: 10px;
-                border: 2px dashed #E63946;
-              }
-              .info-section {
-                margin: 20px 0;
-                padding: 15px;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                background-color: #f9f9f9;
-              }
-              .info-row {
-                display: flex;
-                justify-content: space-between;
-                margin: 10px 0;
-                padding-bottom: 8px;
-                border-bottom: 1px solid #eee;
-              }
-              .info-row:last-child {
-                border-bottom: none;
-              }
-              .label {
-                font-weight: bold;
-                color: #666;
-                min-width: 120px;
-              }
-              .value {
-                text-align: right;
-                flex: 1;
-                font-weight: 500;
-              }
-              .footer {
-                text-align: center;
-                margin-top: 30px;
-                color: #888;
-                font-size: 12px;
-                border-top: 1px solid #eee;
-                padding-top: 15px;
-              }
-              .date {
-                font-size: 11px;
-                color: #999;
-                margin-top: 5px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div class="company-name">SAV PRO</div>
-              <div class="company-subtitle">Service Après-Vente Professionnel</div>
-            </div>
-            
-            <div class="id-display">
-              ${simplifiedID}
-            </div>
-            
-            <div class="info-section">
-              <div class="info-row">
-                <span class="label">Commercial:</span>
-                <span class="value">${declaration.commercial?.name || "—"}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Client:</span>
-                <span class="value">${declaration.client?.name || t("unknownClient")}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Produit:</span>
-                <span class="value">${declaration.product_name}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Référence:</span>
-                <span class="value">${declaration.reference}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">S/N:</span>
-                <span class="value">${declaration.serial_number}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Catégorie:</span>
-                <span class="value">${declaration.category?.name || "—"}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Date création:</span>
-                <span class="value">${formatDate(declaration.created_at)}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Statut:</span>
-                <span class="value">${declaration.status === "nouvelle" ? "Nouvelle" : 
-                                     declaration.status === "en_cours" ? "En cours" : 
-                                     "Réglée"}</span>
-              </div>
-            </div>
-            
-            <div class="footer">
-              <p>SAV Pro - Ticket ID: ${declaration.id.substring(0, 12).toUpperCase()}</p>
-              <p class="date">Généré le: ${new Date().toLocaleDateString('fr-FR', { 
-                day: '2-digit', 
-                month: '2-digit', 
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}</p>
-            </div>
-          </body>
-        </html>
-      `;
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: white;
+}
+
+.ticket {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 10mm;
+}
+
+.id-section {
+  flex: 1.5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-top: 2px solid black;
+  border-bottom: 2px solid black;
+  margin: 2mm 0;
+}
+
+.id-label {
+  font-size: 5mm;
+  font-weight: bold;
+  margin-bottom: 2mm;
+}
+
+.id-value {
+  font-size: 12mm;
+  font-weight: 900;
+  letter-spacing: 1mm;
+}
+
+.info-row {
+  flex: 0.8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1.5px solid black;
+  padding: 2mm 0;
+  font-size: 4mm;
+  font-weight: bold;
+}
+
+.label {
+  font-weight: bold;
+}
+
+.value {
+  text-align: right;
+}
+
+.date-row {
+  flex: 0.3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 3.5mm;
+  font-weight: bold;
+  margin-top: 2mm;
+}
+
+@page {
+  margin: 0;
+  size: auto;
+}
+</style>
+</head>
+<body>
+<div class="ticket">
+  <div class="id-section">
+    <div class="id-label">ID DÉCLARATION</div>
+    <div class="id-value">${simplifiedID}</div>
+  </div>
+  
+  <div class="info-row">
+    <span class="label">Client</span>
+    <span class="value">${declaration.client?.name || "—"}</span>
+  </div>
+  
+  <div class="info-row">
+    <span class="label">Produit</span>
+    <span class="value">${declaration.product_name}</span>
+  </div>
+  
+  <div class="info-row">
+    <span class="label">Réf</span>
+    <span class="value">${declaration.reference || "—"}</span>
+  </div>
+  
+  <div class="info-row">
+    <span class="label">S/N</span>
+    <span class="value">${declaration.serial_number || "—"}</span>
+  </div>
+  
+  <div class="info-row">
+    <span class="label">Commercial</span>
+    <span class="value">${declaration.commercial?.name || "—"}</span>
+  </div>
+  
+  <div class="date-row">
+    ${new Date().toLocaleDateString('fr-FR')}
+  </div>
+</div>
+</body>
+</html>
+`;
 
       await Print.printAsync({
         html,
         orientation: Print.Orientation.portrait,
       });
-      
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Succès", "Ticket imprimé avec succès");
-      
+
     } catch (error: any) {
-      console.error("Print error:", error);
-      Alert.alert("Erreur", "Impossible d'imprimer le ticket: " + error.message);
+      console.error("ERREUR D'IMPRESSION:", error);
+      Alert.alert(
+        "Erreur", 
+        `Impossible d'imprimer: ${error?.message || "Erreur inconnue"}`
+      );
     } finally {
       setIsPrinting(false);
     }
@@ -497,7 +411,7 @@ export default function DeclarationDetailScreen() {
   const simplifiedID = declaration.id.substring(0, 8).toUpperCase();
   const canEditRemarks = isTechnician && 
                         declaration?.technician_id === user?.id && 
-                        declaration?.status === "en_cours";
+                        (declaration?.status === "en_cours" || declaration?.status === "reglee" || declaration?.status === "sortie");
 
   return (
     <>
@@ -648,7 +562,7 @@ export default function DeclarationDetailScreen() {
           </View>
         </View>
 
-        {/* SECTION ACCESSOIRES */}
+        {/* SECTION ACCESSOIRES - VISIBLE POUR TOUS MAINTENANT */}
         {declaration.accessories && declaration.accessories.length > 0 && (
           <View style={[styles.section, { backgroundColor: theme.backgroundDefault }]}>
             <View style={styles.sectionHeader}>
@@ -694,14 +608,14 @@ export default function DeclarationDetailScreen() {
           </View>
         )}
 
-        {/* SECTION REMARQUES TECHNIQUE - INTÉGRÉE DANS LA PAGE */}
+        {/* SECTION REMARQUES TECHNIQUE */}
         <View style={[styles.section, { backgroundColor: theme.backgroundDefault }]}>
           <View style={styles.sectionHeader}>
             <Feather name="message-square" size={20} color={theme.secondary} />
             <ThemedText type="h4">{t("technicianRemarks")}</ThemedText>
             
             {/* BOUTON MODIFIER SI LE TECHNICIEN PEUT ÉDITER */}
-            {canEditRemarks && !isEditingRemarks && (
+            {isTechnician && declaration?.technician_id === user?.id && !isEditingRemarks && (
               <Pressable 
                 style={styles.editButton}
                 onPress={() => setIsEditingRemarks(true)}
@@ -766,7 +680,7 @@ export default function DeclarationDetailScreen() {
               </ThemedText>
               
               {/* MESSAGE POUR LE TECHNICIEN SI IL PEUT AJOUTER DES REMARQUES */}
-              {canEditRemarks && !declaration.technician_remarks && (
+              {isTechnician && declaration?.technician_id === user?.id && !declaration.technician_remarks && (
                 <ThemedText style={styles.addRemarksHint}>
                   Cliquez sur l'icône ✏️ pour ajouter vos remarques.
                 </ThemedText>
@@ -816,11 +730,24 @@ export default function DeclarationDetailScreen() {
                 </View>
               </View>
             )}
+
+            {/* Date de sortie avec le nom de la personne */}
+            {declaration.completed_at && (
+              <View style={styles.timelineItem}>
+                <View style={[styles.timelineDot, { backgroundColor: "#9C27B0" }]} />
+                <View style={styles.timelineContent}>
+                  <ThemedText style={[styles.timelineLabel, { color: theme.textSecondary }]}>
+                    Sortie par: {declaration.completed_by || "Inconnu"}
+                  </ThemedText>
+                  <ThemedText>{formatDateTime(declaration.completed_at)}</ThemedText>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 
         {/* SECTION ACTIONS */}
-        {(canTakeCharge || canResolve || canDelete || isCommercial) && (
+        {(canTakeCharge || canResolve || canComplete || canDelete || isCommercial || isTechnician) && (
           <View style={styles.actionsSection}>
             {canTakeCharge && (
               <Button
@@ -852,8 +779,24 @@ export default function DeclarationDetailScreen() {
               </Button>
             )}
 
-            {/* BOUTON GÉNÉRER TICKET POUR COMMERCIAUX */}
-            {isCommercial && declaration?.commercial_id === user?.id && (
+            {/* Bouton Sortie avec popup */}
+            {canComplete && (
+              <Button
+                onPress={handleComplete}
+                disabled={isLoading}
+                style={[styles.actionButton, { backgroundColor: "#9C27B0" }]}
+              >
+                <View style={styles.buttonInner}>
+                  <Feather name="check-square" size={18} color="#FFFFFF" />
+                  <ThemedText style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    Sortie
+                  </ThemedText>
+                </View>
+              </Button>
+            )}
+
+            {/* BOUTON GÉNÉRER TICKET POUR COMMERCIAUX ET TECHNICIENS */}
+            {(isCommercial || isTechnician) && (
               <Button
                 onPress={handleGenerateTicket}
                 style={[styles.actionButton, { backgroundColor: theme.secondary }]}
@@ -883,6 +826,74 @@ export default function DeclarationDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* MODAL POUR SAISIR LE NOM DE SORTIE */}
+      <Modal
+        visible={showNameInput}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNameInput(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setShowNameInput(false)}
+        >
+          <View style={styles.modalContentContainer}>
+            <Pressable 
+              style={[styles.nameInputModal, { backgroundColor: theme.backgroundDefault }]}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <ThemedText type="h4" style={styles.modalTitle}>
+                Sortie par
+              </ThemedText>
+              <ThemedText style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+                Qui récupère ce produit ?
+              </ThemedText>
+
+              <TextInput
+                style={[
+                  styles.nameInput,
+                  {
+                    backgroundColor: theme.backgroundSecondary,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  },
+                ]}
+                placeholder="Nom du client / technicien..."
+                placeholderTextColor={theme.textTertiary}
+                value={exitName}
+                onChangeText={setExitName}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={submitComplete}
+              />
+
+              <View style={styles.modalButtons}>
+                <Button
+                  onPress={() => {
+                    setShowNameInput(false);
+                    setExitName("");
+                  }}
+                  style={[styles.modalButton, { backgroundColor: theme.backgroundSecondary }]}
+                >
+                  <ThemedText style={{ color: theme.textSecondary }}>
+                    Annuler
+                  </ThemedText>
+                </Button>
+                
+                <Button
+                  onPress={submitComplete}
+                  style={[styles.modalButton, { backgroundColor: theme.primary }]}
+                >
+                  <ThemedText style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    Valider
+                  </ThemedText>
+                </Button>
+              </View>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* MODAL DU TICKET */}
       <Modal
@@ -1232,6 +1243,38 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: Spacing.xl,
+  },
+  modalContentContainer: {
+    width: "100%",
+    maxWidth: 400,
+  },
+  nameInputModal: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+  },
+  modalTitle: {
+    textAlign: "center",
+    marginBottom: Spacing.sm,
+  },
+  modalSubtitle: {
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+  },
+  nameInput: {
+    height: Spacing.inputHeight,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.lg,
+    fontSize: 16,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: Spacing.md,
   },
   modalContent: {
     width: "100%",
