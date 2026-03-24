@@ -30,14 +30,20 @@ export default function ClientDeclarationsScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute();
-  const { clientId, clientName } = route.params as RouteParams;
   const { token } = useAuth();
+
+  // ✅ Sécurise la récupération des paramètres
+  const params = route.params as RouteParams;
+  const clientId = params?.clientId;
+  const clientName = params?.clientName;
 
   const [declarations, setDeclarations] = useState<Declaration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchDeclarations = useCallback(async () => {
+    if (!clientId) return;
+    
     try {
       const baseUrl = getApiUrl();
       const response = await fetch(new URL("/api/declarations", baseUrl).href, {
@@ -67,6 +73,15 @@ export default function ClientDeclarationsScreen() {
     setIsRefreshing(true);
     fetchDeclarations();
   };
+
+  // ✅ Si pas de clientId, afficher un message d'erreur
+  if (!clientId) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot, justifyContent: "center", alignItems: "center" }]}>
+        <ThemedText>Erreur : client non trouvé</ThemedText>
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
