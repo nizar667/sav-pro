@@ -112,7 +112,7 @@ app.post("/api/auth/login", async (req, res) => {
         name: user.name
       },
       JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "365d" }
     );
     
     console.log("✅ Login réussi pour:", email);
@@ -569,7 +569,7 @@ app.get("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
         completed_at,
         completed_by,
         commercial_id,
-        client:clients(id, name, email, phone, address),
+        client:clients!declarations_client_id_fkey(id, name, email, phone, address),
         category:categories(id, name),
         commercial:users!declarations_commercial_id_fkey(id, name, email, role),
         technician:users!declarations_technician_id_fkey(id, name, email, role)
@@ -598,7 +598,6 @@ app.get("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
     });
   }
 });
-
 app.get("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
