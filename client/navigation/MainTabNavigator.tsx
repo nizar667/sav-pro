@@ -8,6 +8,7 @@ import ClientsStackNavigator from "@/navigation/ClientsStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import AdminDashboardScreen from "@/screens/AdminDashboardScreen";
 import IDEntryScreen from "@/screens/IDEntryScreen";
+import GlassDashboardScreen from "@/screens/GlassDashboardScreen";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -17,6 +18,7 @@ export type MainTabParamList = {
   ProfileTab: undefined;
   AdminTab: undefined;
   IDEntryTab: undefined;
+  GlassDashboardTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -80,6 +82,20 @@ export default function MainTabNavigator() {
           }}
         />
       ) : null}
+      
+      {/* ONGLET VERRE CASSÉ - Uniquement pour techniciens */}
+      {isTechnician && (
+        <Tab.Screen
+          name="GlassDashboardTab"
+          component={GlassDashboardScreen}
+          options={{
+            title: "Verre cassé",
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="alert-triangle" size={size} color={color} />
+            ),
+          }}
+        />
+      )}
       
       {/* ONGLET SAISIR ID - Pour commerciaux ET techniciens */}
       {(isTechnician || isCommercial) ? (

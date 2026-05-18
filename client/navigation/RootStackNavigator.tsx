@@ -8,8 +8,9 @@ import DeclarationDetailScreen from "../screens/DeclarationDetailScreen";
 import NewDeclarationScreen from "../screens/NewDeclarationScreen";
 import NewClientScreen from "../screens/NewClientScreen";
 import ClientDetailScreen from "../screens/ClientDetailScreen";
-import ClientDeclarationsScreen from "../screens/ClientDeclarationsScreen"; // NOUVEAU
+import ClientDeclarationsScreen from "../screens/ClientDeclarationsScreen";
 import AllUsersScreen from "../screens/AllUsersScreen";
+import GlassDashboardScreen from "../screens/GlassDashboardScreen";
 import { useScreenOptions } from "../hooks/useScreenOptions";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../hooks/useTheme";
@@ -22,8 +23,9 @@ export type RootStackParamList = {
   NewDeclaration: undefined;
   NewClient: undefined;
   ClientDetail: { client: Client };
-  ClientDeclarations: { clientId: string; clientName: string }; // NOUVEAU
+  ClientDeclarations: { clientId: string; clientName: string };
   AllUsers: undefined;
+  GlassDashboard: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -88,6 +90,11 @@ export default function RootStackNavigator() {
               headerTitle: "Tous les utilisateurs",
               presentation: "modal",
             }}
+          />
+          <Stack.Screen
+            name="GlassDashboard"
+            component={GlassDashboardScreen}
+            options={{ headerTitle: "Verre cassé" }}
           />
         </>
       ) : (

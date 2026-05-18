@@ -27,7 +27,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { getApiUrl } from "@/lib/query-client";
-import { Declaration } from "@/types";
+import { Declaration, GLASS_SIZES, GLASS_SUPPLIERS } from "@/types";
 
 type RouteParams = RouteProp<RootStackParamList, "DeclarationDetail">;
 
@@ -51,13 +51,17 @@ export default function DeclarationDetailScreen() {
   const [isSavingRemarks, setIsSavingRemarks] = useState(false);
   const [showNameInput, setShowNameInput] = useState(false);
   const [exitName, setExitName] = useState("");
+  
+  // États pour le diagnostic verre
+  const [glassBroken, setGlassBroken] = useState(false);
+  const [glassSize, setGlassSize] = useState<number | null>(null);
+  const [glassSupplier, setGlassSupplier] = useState<string | null>(null);
+  const [isSavingGlass, setIsSavingGlass] = useState(false);
 
   useEffect(() => {
-    console.log("📱 Route params:", route.params);
     if (!route.params?.declaration && token) {
       const declarationId = (route.params as any)?.declarationId || 
                            (route.params?.declaration as any)?.id;
-      console.log("🔍 declarationId trouvé:", declarationId);
       if (declarationId) {
         fetchDeclaration(declarationId);
       } else {
@@ -70,6 +74,12 @@ export default function DeclarationDetailScreen() {
   useEffect(() => {
     if (declaration?.technician_remarks) {
       setTechnicianRemarks(declaration.technician_remarks);
+    }
+    // Charger les données verre existantes
+    if (declaration) {
+      setGlassBroken(declaration.glass_broken || false);
+      setGlassSize(declaration.glass_size || null);
+      setGlassSupplier(declaration.glass_supplier || null);
     }
   }, [declaration]);
 
@@ -102,6 +112,8 @@ export default function DeclarationDetailScreen() {
 
   const isTechnician = user?.role === "technicien";
   const isCommercial = user?.role === "commercial";
+  const isTV = declaration?.category?.name === "Télévision";
+  
   const canTakeCharge = isTechnician && declaration?.status === "nouvelle";
   const canResolve =
     isTechnician &&
@@ -118,6 +130,8 @@ export default function DeclarationDetailScreen() {
      declaration.status === "en_cours" || 
      declaration.status === "reglee" ||
      declaration.status === "sortie");
+  const canEditGlass = isTechnician && declaration?.technician_id === user?.id && 
+                       (declaration?.status === "en_cours" || declaration?.status === "reglee");
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
@@ -139,6 +153,51 @@ export default function DeclarationDetailScreen() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // ========== DIAGNOSTIC VERRE ==========
+  const handleSaveGlassDiagnostic = async () => {
+    if (!declaration || !token) return;
+    
+    if (glassBroken && (!glassSize || !glassSupplier)) {
+      Alert.alert("Information", "Veuillez sélectionner la taille et le fournisseur");
+      return;
+    }
+
+    setIsSavingGlass(true);
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(
+        new URL(`/api/declarations/${declaration.id}/glass`, baseUrl).href,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            glass_broken: glassBroken,
+            glass_size: glassSize,
+            glass_supplier: glassSupplier,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const updated = await response.json();
+        setDeclaration(prev => prev ? { ...prev, ...updated.data } : prev);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert("Succès", "Diagnostic verre enregistré");
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Erreur enregistrement");
+      }
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Erreur", error.message);
+    } finally {
+      setIsSavingGlass(false);
+    }
   };
 
   const handleTakeCharge = async () => {
@@ -163,8 +222,6 @@ export default function DeclarationDetailScreen() {
         setDeclaration(updatedDeclaration);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(t("success"), t("declarationTaken"));
-        
-        // ✅ IMPRESSION AUTOMATIQUE POUR LE TECHNICIEN
         handlePrintTicket();
       } else {
         const errorData = await response.json();
@@ -225,7 +282,6 @@ export default function DeclarationDetailScreen() {
     );
   };
 
-  // CORRECTION : Le bouton "Sortie" ouvre le modal de saisie du nom
   const handleComplete = () => {
     if (!declaration || !token) return;
     setShowNameInput(true);
@@ -274,10 +330,7 @@ export default function DeclarationDetailScreen() {
     } catch (error: any) {
       console.error("❌ Complete error:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(
-        "Erreur", 
-        error.message || "Impossible de marquer comme sortie."
-      );
+      Alert.alert("Erreur", error.message || "Impossible de marquer comme sortie.");
     } finally {
       setIsLoading(false);
     }
@@ -343,9 +396,7 @@ export default function DeclarationDetailScreen() {
               );
 
               if (response.ok) {
-                Haptics.notificationAsync(
-                  Haptics.NotificationFeedbackType.Success
-                );
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 Alert.alert(t("success"), t("declarationDeleted"));
                 navigation.goBack();
               } else {
@@ -380,6 +431,8 @@ export default function DeclarationDetailScreen() {
 
     try {
       const simplifiedID = declaration.id.substring(0, 8).toUpperCase();
+      const isGlassBroken = declaration.glass_broken || glassBroken;
+      const glassIcon = isGlassBroken ? ' ⚠️📺💥 VERRE CASSÉ ⚠️' : '';
 
       const html = `
 <!DOCTYPE html>
@@ -452,6 +505,17 @@ html, body {
   text-align: right;
 }
 
+.glass-warning {
+  color: red;
+  font-weight: bold;
+  background-color: #ffeeee;
+  padding: 2mm;
+  margin: 2mm 0;
+  border: 1px solid red;
+  border-radius: 2mm;
+  text-align: center;
+}
+
 .date-row {
   flex: 0.3;
   display: flex;
@@ -475,6 +539,8 @@ html, body {
     <div class="id-value">${simplifiedID}</div>
   </div>
   
+  ${isGlassBroken ? '<div class="glass-warning">⚠️ VERRE CASSÉ - TV ENDOMMAGÉE ⚠️</div>' : ''}
+  
   <div class="info-row">
     <span class="label">Client</span>
     <span class="value">${declaration.client?.name || "—"}</span>
@@ -482,7 +548,7 @@ html, body {
   
   <div class="info-row">
     <span class="label">Produit</span>
-    <span class="value">${declaration.product_name}</span>
+    <span class="value">${declaration.product_name}${glassIcon}</span>
   </div>
   
   <div class="info-row">
@@ -518,10 +584,7 @@ html, body {
 
     } catch (error: any) {
       console.error("ERREUR D'IMPRESSION:", error);
-      Alert.alert(
-        "Erreur", 
-        `Impossible d'imprimer: ${error?.message || "Erreur inconnue"}`
-      );
+      Alert.alert("Erreur", `Impossible d'imprimer: ${error?.message || "Erreur inconnue"}`);
     } finally {
       setIsPrinting(false);
     }
@@ -529,7 +592,6 @@ html, body {
 
   const copySimplifiedID = () => {
     if (!declaration) return;
-    
     const simplifiedID = declaration.id.substring(0, 8).toUpperCase();
     Alert.alert("ID copié", `ID: ${simplifiedID}`, [{ text: "OK" }]);
   };
@@ -578,9 +640,11 @@ html, body {
 
           <ThemedText type="h2" style={styles.productName}>
             {declaration.product_name}
+            {(declaration.glass_broken || glassBroken) && (
+              <ThemedText style={{ color: theme.primary }}> 📺💥</ThemedText>
+            )}
           </ThemedText>
 
-          {/* AFFICHAGE DE L'ID SIMPLIFIÉ */}
           <Pressable 
             style={[styles.idContainer, { backgroundColor: theme.primary + "10" }]}
             onPress={copySimplifiedID}
@@ -649,7 +713,6 @@ html, body {
             </View>
           </View>
 
-          {/* SECTION DESCRIPTION DU PROBLÈME */}
           {declaration.description && (
             <View style={styles.descriptionBox}>
               <View style={styles.descriptionHeader}>
@@ -664,6 +727,109 @@ html, body {
             </View>
           )}
         </View>
+
+        {/* ========== SECTION DIAGNOSTIC VERRE (uniquement pour TV) ========== */}
+        {isTV && canEditGlass && (
+          <View style={[styles.section, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={styles.sectionHeader}>
+              <Feather name="alert-triangle" size={20} color={theme.warning} />
+              <ThemedText type="h4">Diagnostic verre</ThemedText>
+            </View>
+
+            <View style={styles.glassRow}>
+              <Pressable 
+                style={styles.checkboxRow}
+                onPress={() => setGlassBroken(!glassBroken)}
+              >
+                <View style={[styles.checkbox, { borderColor: theme.border, backgroundColor: glassBroken ? theme.primary : 'transparent' }]}>
+                  {glassBroken && <Feather name="check" size={14} color="#FFFFFF" />}
+                </View>
+                <ThemedText>Problème verre constaté</ThemedText>
+              </Pressable>
+            </View>
+
+            {glassBroken && (
+              <>
+                <View style={styles.glassSelectContainer}>
+                  <ThemedText style={[styles.glassLabel, { color: theme.textSecondary }]}>
+                    Taille (pouces)
+                  </ThemedText>
+                  <View style={styles.glassSelectRow}>
+                    {GLASS_SIZES.map((size) => (
+                      <Pressable
+                        key={size}
+                        style={[
+                          styles.glassOption,
+                          {
+                            backgroundColor: glassSize === size ? theme.primary : theme.backgroundSecondary,
+                            borderColor: glassSize === size ? theme.primary : theme.border,
+                          },
+                        ]}
+                        onPress={() => setGlassSize(size)}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.glassOptionText,
+                            { color: glassSize === size ? "#FFFFFF" : theme.text },
+                          ]}
+                        >
+                          {size}"
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.glassSelectContainer}>
+                  <ThemedText style={[styles.glassLabel, { color: theme.textSecondary }]}>
+                    Fournisseur
+                  </ThemedText>
+                  <View style={styles.glassSupplierRow}>
+                    {GLASS_SUPPLIERS.map((supplier) => (
+                      <Pressable
+                        key={supplier}
+                        style={[
+                          styles.glassSupplierOption,
+                          {
+                            backgroundColor: glassSupplier === supplier ? theme.primary : theme.backgroundSecondary,
+                            borderColor: glassSupplier === supplier ? theme.primary : theme.border,
+                          },
+                        ]}
+                        onPress={() => setGlassSupplier(supplier)}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.glassOptionText,
+                            { color: glassSupplier === supplier ? "#FFFFFF" : theme.text },
+                          ]}
+                        >
+                          {supplier}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                <Button
+                  onPress={handleSaveGlassDiagnostic}
+                  disabled={isSavingGlass}
+                  style={[styles.glassButton, { backgroundColor: theme.warning }]}
+                >
+                  {isSavingGlass ? "Enregistrement..." : "Enregistrer diagnostic verre"}
+                </Button>
+              </>
+            )}
+
+            {(declaration.glass_broken || glassBroken) && (declaration.glass_size || glassSize) && (
+              <View style={styles.glassInfoSaved}>
+                <Feather name="check-circle" size={16} color={theme.success} />
+                <ThemedText style={{ color: theme.success }}>
+                  Diagnostic enregistré: {declaration.glass_size || glassSize}" - {declaration.glass_supplier || glassSupplier}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* SECTION RESPONSABLES */}
         <View style={[styles.section, { backgroundColor: theme.backgroundDefault }]}>
@@ -753,7 +919,6 @@ html, body {
             <Feather name="message-square" size={20} color={theme.secondary} />
             <ThemedText type="h4">{t("technicianRemarks")}</ThemedText>
             
-            {/* BOUTON MODIFIER SI LE TECHNICIEN PEUT ÉDITER */}
             {isTechnician && declaration?.technician_id === user?.id && !isEditingRemarks && (
               <Pressable 
                 style={styles.editButton}
@@ -818,7 +983,6 @@ html, body {
                 {declaration.technician_remarks || "Aucune remarque pour le moment."}
               </ThemedText>
               
-              {/* MESSAGE POUR LE TECHNICIEN SI IL PEUT AJOUTER DES REMARQUES */}
               {isTechnician && declaration?.technician_id === user?.id && !declaration.technician_remarks && (
                 <ThemedText style={styles.addRemarksHint}>
                   Cliquez sur l'icône ✏️ pour ajouter vos remarques.
@@ -870,7 +1034,6 @@ html, body {
               </View>
             )}
 
-            {/* Date de sortie */}
             {declaration.completed_at && (
               <View style={styles.timelineItem}>
                 <View style={[styles.timelineDot, { backgroundColor: "#9C27B0" }]} />
@@ -918,7 +1081,6 @@ html, body {
               </Button>
             )}
 
-            {/* Bouton Sortie - corrigé */}
             {canComplete && (
               <Button
                 onPress={handleComplete}
@@ -934,7 +1096,6 @@ html, body {
               </Button>
             )}
 
-            {/* BOUTON GÉNÉRER TICKET POUR COMMERCIAUX ET TECHNICIENS */}
             {(isCommercial || isTechnician) && (
               <Button
                 onPress={handleGenerateTicket}
@@ -1082,6 +1243,7 @@ html, body {
                     <ThemedText style={styles.ticketLabel}>Produit:</ThemedText>
                     <ThemedText style={styles.ticketValue}>
                       {declaration.product_name}
+                      {(declaration.glass_broken || glassBroken) && " 📺💥"}
                     </ThemedText>
                   </View>
                   
@@ -1148,365 +1310,94 @@ html, body {
   );
 }
 
-// Les styles restent inchangés
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.lg,
-  },
-  mainHeader: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
-  },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  dateContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  dateText: {
-    fontSize: 14,
-  },
-  productName: {
-    marginBottom: Spacing.sm,
-  },
-  idContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    marginVertical: Spacing.md,
-    alignSelf: "flex-start",
-  },
-  idLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  copyIcon: {
-    marginLeft: Spacing.xs,
-  },
-  clientInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  clientText: {
-    fontSize: 15,
-  },
-  section: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  editButton: {
-    marginLeft: 'auto',
-    padding: Spacing.xs,
-  },
-  infoGrid: {
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  infoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.sm,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  serialNumberText: {
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  descriptionBox: {
-    marginTop: Spacing.lg,
-    padding: Spacing.md,
-    backgroundColor: "rgba(128, 128, 128, 0.05)",
-    borderRadius: BorderRadius.sm,
-  },
-  descriptionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  descriptionLabel: {
-    fontSize: 12,
-  },
-  descriptionText: {
-    lineHeight: 20,
-    fontSize: 14,
-  },
-  responsiblesGrid: {
-    gap: Spacing.lg,
-  },
-  responsibleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  responsibleIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.sm,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  responsibleContent: {
-    flex: 1,
-  },
-  responsibleLabel: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  accessoriesList: {
-    gap: Spacing.sm,
-  },
-  accessoryItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  accessoryText: {
-    fontSize: 14,
-  },
-  photo: {
-    width: "100%",
-    height: 200,
-    borderRadius: BorderRadius.sm,
-  },
-  remarksEditContainer: {
-    marginTop: Spacing.sm,
-  },
-  remarksInput: {
-    minHeight: 120,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    fontSize: 16,
-    borderWidth: 1,
-    textAlignVertical: 'top',
-    marginBottom: Spacing.md,
-  },
-  remarksActions: {
-    flexDirection: "row",
-    gap: Spacing.md,
-  },
-  remarksButton: {
-    flex: 1,
-    height: 44,
-    justifyContent: "center",
-    borderRadius: BorderRadius.md,
-  },
-  remarksBox: {
-    padding: Spacing.md,
-    backgroundColor: "rgba(128, 128, 128, 0.05)",
-    borderRadius: BorderRadius.sm,
-  },
-  remarksText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  noRemarksText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#999",
-    fontStyle: "italic",
-  },
-  addRemarksHint: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: Spacing.sm,
-    fontStyle: "italic",
-  },
-  timeline: {
-    gap: Spacing.lg,
-  },
-  timelineItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: Spacing.md,
-  },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 4,
-  },
-  timelineContent: {
-    flex: 1,
-  },
-  timelineLabel: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  actionsSection: {
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
-  actionButton: {
-    marginTop: 0,
-  },
-  buttonInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: Spacing.xl,
-  },
-  modalContentContainer: {
-    width: "100%",
-    maxWidth: 400,
-  },
-  nameInputModal: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
-  },
-  modalTitle: {
-    textAlign: "center",
-    marginBottom: Spacing.sm,
-  },
-  modalSubtitle: {
-    textAlign: "center",
-    marginBottom: Spacing.lg,
-  },
-  nameInput: {
-    height: Spacing.inputHeight,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.lg,
-    fontSize: 16,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    gap: Spacing.md,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-  },
-  modalContent: {
-    width: "100%",
-    maxWidth: 500,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.lg,
-  },
-  ticketScroll: {
-    flex: 1,
-  },
-  ticketContent: {
-    alignItems: "center",
-    padding: Spacing.xl,
-    borderWidth: 2,
-    borderColor: "#E63946",
-    borderRadius: BorderRadius.md,
-    marginVertical: Spacing.lg,
-  },
-  ticketHeader: {
-    alignItems: "center",
-    marginBottom: Spacing.xl,
-  },
-  ticketTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#E63946",
-  },
-  ticketSubtitle: {
-    fontSize: 16,
-    color: "#666",
-    marginTop: Spacing.xs,
-  },
-  ticketID: {
-    marginVertical: Spacing.xl,
-    padding: Spacing.xl,
-    backgroundColor: "#F8F9FA",
-    borderRadius: BorderRadius.md,
-    borderWidth: 2,
-    borderColor: "#E63946",
-    borderStyle: "dashed",
-  },
-  ticketIDText: {
-    fontSize: 42,
-    fontWeight: "bold",
-    letterSpacing: 3,
-    color: "#E63946",
-    textAlign: "center",
-  },
-  ticketInfo: {
-    width: "100%",
-    marginTop: Spacing.xl,
-  },
-  ticketRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEE",
-  },
-  ticketLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
-  },
-  ticketValue: {
-    fontSize: 14,
-    fontWeight: "500",
-    textAlign: "right",
-  },
-  ticketFooter: {
-    marginTop: Spacing.xl,
-    alignItems: "center",
-  },
-  ticketFooterText: {
-    fontSize: 12,
-    color: "#999",
-    textAlign: "center",
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  modalButton: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  content: { paddingHorizontal: Spacing.lg, gap: Spacing.lg },
+  mainHeader: { padding: Spacing.lg, borderRadius: BorderRadius.md },
+  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.md },
+  dateContainer: { flexDirection: "row", alignItems: "center", gap: Spacing.xs },
+  dateText: { fontSize: 14 },
+  productName: { marginBottom: Spacing.sm },
+  idContainer: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm, marginVertical: Spacing.md, alignSelf: "flex-start" },
+  idLabel: { fontSize: 14, fontWeight: "600" },
+  copyIcon: { marginLeft: Spacing.xs },
+  clientInfo: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+  clientText: { fontSize: 15 },
+  section: { padding: Spacing.lg, borderRadius: BorderRadius.md },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.md, marginBottom: Spacing.lg },
+  editButton: { marginLeft: 'auto', padding: Spacing.xs },
+  infoGrid: { gap: Spacing.md, marginBottom: Spacing.lg },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: Spacing.md },
+  infoIcon: { width: 36, height: 36, borderRadius: BorderRadius.sm, justifyContent: "center", alignItems: "center" },
+  infoContent: { flex: 1 },
+  infoLabel: { fontSize: 12, marginBottom: 2 },
+  serialNumberText: { fontSize: 15, fontWeight: "500" },
+  descriptionBox: { marginTop: Spacing.lg, padding: Spacing.md, backgroundColor: "rgba(128, 128, 128, 0.05)", borderRadius: BorderRadius.sm },
+  descriptionHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.sm },
+  descriptionLabel: { fontSize: 12 },
+  descriptionText: { lineHeight: 20, fontSize: 14 },
+  responsiblesGrid: { gap: Spacing.lg },
+  responsibleRow: { flexDirection: "row", alignItems: "center", gap: Spacing.md },
+  responsibleIcon: { width: 36, height: 36, borderRadius: BorderRadius.sm, justifyContent: "center", alignItems: "center" },
+  responsibleContent: { flex: 1 },
+  responsibleLabel: { fontSize: 12, marginBottom: 2 },
+  accessoriesList: { gap: Spacing.sm },
+  accessoryItem: { flexDirection: "row", alignItems: "center", gap: Spacing.md },
+  accessoryText: { fontSize: 14 },
+  photo: { width: "100%", height: 200, borderRadius: BorderRadius.sm },
+  remarksEditContainer: { marginTop: Spacing.sm },
+  remarksInput: { minHeight: 120, borderRadius: BorderRadius.md, padding: Spacing.md, fontSize: 16, borderWidth: 1, textAlignVertical: 'top', marginBottom: Spacing.md },
+  remarksActions: { flexDirection: "row", gap: Spacing.md },
+  remarksButton: { flex: 1, height: 44, justifyContent: "center", borderRadius: BorderRadius.md },
+  remarksBox: { padding: Spacing.md, backgroundColor: "rgba(128, 128, 128, 0.05)", borderRadius: BorderRadius.sm },
+  remarksText: { fontSize: 14, lineHeight: 20 },
+  noRemarksText: { fontSize: 14, lineHeight: 20, color: "#999", fontStyle: "italic" },
+  addRemarksHint: { fontSize: 12, color: "#666", marginTop: Spacing.sm, fontStyle: "italic" },
+  timeline: { gap: Spacing.lg },
+  timelineItem: { flexDirection: "row", alignItems: "flex-start", gap: Spacing.md },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  timelineContent: { flex: 1 },
+  timelineLabel: { fontSize: 12, marginBottom: 2 },
+  actionsSection: { gap: Spacing.md, marginBottom: Spacing.xl },
+  actionButton: { marginTop: 0 },
+  buttonInner: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+  
+  // Styles pour le diagnostic verre
+  glassRow: { marginBottom: Spacing.md },
+  checkboxRow: { flexDirection: "row", alignItems: "center", gap: Spacing.md },
+  checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, justifyContent: "center", alignItems: "center" },
+  glassSelectContainer: { marginBottom: Spacing.md },
+  glassLabel: { fontSize: 14, marginBottom: Spacing.sm },
+  glassSelectRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
+  glassOption: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm, borderWidth: 1 },
+  glassOptionText: { fontSize: 14, fontWeight: "500" },
+  glassSupplierRow: { flexDirection: "row", gap: Spacing.md },
+  glassSupplierOption: { flex: 1, paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, borderWidth: 1, alignItems: "center" },
+  glassButton: { marginTop: Spacing.md },
+  glassInfoSaved: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginTop: Spacing.md, padding: Spacing.sm, backgroundColor: "rgba(6, 214, 160, 0.1)", borderRadius: BorderRadius.sm },
+  
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.5)", justifyContent: "center", alignItems: "center", padding: Spacing.xl },
+  modalContentContainer: { width: "100%", maxWidth: 400 },
+  nameInputModal: { borderRadius: BorderRadius.lg, padding: Spacing.xl },
+  modalTitle: { textAlign: "center", marginBottom: Spacing.sm },
+  modalSubtitle: { textAlign: "center", marginBottom: Spacing.lg },
+  nameInput: { height: Spacing.inputHeight, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.lg, fontSize: 16, borderWidth: 1, marginBottom: Spacing.lg },
+  modalButtons: { flexDirection: "row", gap: Spacing.md },
+  modalButton: { flex: 1, paddingVertical: Spacing.md },
+  modalContent: { width: "100%", maxWidth: 500, borderRadius: BorderRadius.lg, padding: Spacing.xl, maxHeight: '80%' },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.lg },
+  ticketScroll: { flex: 1 },
+  ticketContent: { alignItems: "center", padding: Spacing.xl, borderWidth: 2, borderColor: "#E63946", borderRadius: BorderRadius.md, marginVertical: Spacing.lg },
+  ticketHeader: { alignItems: "center", marginBottom: Spacing.xl },
+  ticketTitle: { fontSize: 28, fontWeight: "bold", color: "#E63946" },
+  ticketSubtitle: { fontSize: 16, color: "#666", marginTop: Spacing.xs },
+  ticketID: { marginVertical: Spacing.xl, padding: Spacing.xl, backgroundColor: "#F8F9FA", borderRadius: BorderRadius.md, borderWidth: 2, borderColor: "#E63946", borderStyle: "dashed" },
+  ticketIDText: { fontSize: 42, fontWeight: "bold", letterSpacing: 3, color: "#E63946", textAlign: "center" },
+  ticketInfo: { width: "100%", marginTop: Spacing.xl },
+  ticketRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: "#EEE" },
+  ticketLabel: { fontSize: 14, fontWeight: "600", color: "#666" },
+  ticketValue: { fontSize: 14, fontWeight: "500", textAlign: "right" },
+  ticketFooter: { marginTop: Spacing.xl, alignItems: "center" },
+  ticketFooterText: { fontSize: 12, color: "#999", textAlign: "center" },
+  modalActions: { flexDirection: "row", gap: Spacing.md, marginTop: Spacing.lg },
 });
