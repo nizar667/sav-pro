@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { FlatList, RefreshControl, View, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { FAB } from "@/components/FAB";
 import { ThemedText } from "@/components/ThemedText";
+import { SearchBar } from "@/components/SearchBar";
 import { Declaration, DeclarationStatus } from "@/types";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { getApiUrl } from "@/lib/query-client";
@@ -34,13 +35,27 @@ export default function DeclarationsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const FILTERS: { key: FilterStatus; label: string }[] = [
-    { key: "all", label: t("all") },
-    { key: "nouvelle", label: t("new") },
-    { key: "en_cours", label: t("inProgress") },
-    { key: "reglee", label: t("resolved") },
-  ];
+  const isTechnician = user?.role === "technicien";
+  const isCommercial = user?.role === "commercial";
+
+  const getFilters = () => {
+    const baseFilters: { key: FilterStatus; label: string }[] = [
+      { key: "all", label: t("all") },
+      { key: "nouvelle", label: t("new") },
+      { key: "en_cours", label: t("inProgress") },
+      { key: "reglee", label: t("resolved") },
+    ];
+
+    if (isTechnician) {
+      baseFilters.push({ key: "sortie", label: "Sortie" });
+    }
+
+    return baseFilters;
+  };
+
+  const FILTERS = getFilters();
 
   const fetchDeclarations = useCallback(async () => {
     try {
@@ -72,11 +87,28 @@ export default function DeclarationsScreen() {
     fetchDeclarations();
   };
 
-  const filteredDeclarations = declarations.filter((d) =>
-    filter === "all" ? true : d.status === filter
-  );
+  const filteredDeclarations = useMemo(() => {
+    let filtered = declarations;
 
-  const isCommercial = user?.role === "commercial";
+    if (filter !== "all") {
+      filtered = filtered.filter((d) => d.status === filter);
+    }
+
+    if (searchQuery.trim() !== "") {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((d) => {
+        return (
+          d.client?.name?.toLowerCase().includes(query) ||
+          d.product_name?.toLowerCase().includes(query) ||
+          d.reference?.toLowerCase().includes(query) ||
+          d.serial_number?.toLowerCase().includes(query) ||
+          d.id?.toLowerCase().includes(query)
+        );
+      });
+    }
+
+    return filtered;
+  }, [declarations, filter, searchQuery]);
 
   if (isLoading) {
     return (
@@ -115,37 +147,54 @@ export default function DeclarationsScreen() {
           />
         }
         ListHeaderComponent={
-          <View style={styles.filterContainer}>
-            {FILTERS.map((f) => (
-              <Pressable
-                key={f.key}
-                style={[
-                  styles.filterButton,
-                  {
-                    backgroundColor:
-                      filter === f.key ? theme.primary : theme.backgroundDefault,
-                    borderColor: filter === f.key ? theme.primary : theme.border,
-                  },
-                ]}
-                onPress={() => setFilter(f.key)}
-              >
-                <ThemedText
+          <>
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Rechercher client, produit, référence..."
+            />
+
+            <View style={styles.filterContainer}>
+              {FILTERS.map((f) => (
+                <Pressable
+                  key={f.key}
                   style={[
-                    styles.filterText,
-                    { color: filter === f.key ? "#FFFFFF" : theme.text },
+                    styles.filterButton,
+                    {
+                      backgroundColor:
+                        filter === f.key ? theme.primary : theme.backgroundDefault,
+                      borderColor: filter === f.key ? theme.primary : theme.border,
+                    },
                   ]}
+                  onPress={() => setFilter(f.key)}
                 >
-                  {f.label}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
+                  <ThemedText
+                    style={[
+                      styles.filterText,
+                      { color: filter === f.key ? "#FFFFFF" : theme.text },
+                    ]}
+                  >
+                    {f.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+
+            {searchQuery.length > 0 && (
+              <ThemedText style={[styles.resultText, { color: theme.textSecondary }]}>
+                {filteredDeclarations.length} résultat(s) pour "{searchQuery}"
+              </ThemedText>
+            )}
+          </>
         }
         ListEmptyComponent={
           <EmptyState
-source={require("../assets/images/icon.png")}            title={t("noDeclarations")}
+            source={require("../assets/images/icon.png")}
+            title={t("noDeclarations")}
             message={
-              isCommercial
+              searchQuery.length > 0
+                ? `Aucune déclaration ne correspond à "${searchQuery}"`
+                : isCommercial
                 ? t("emptyDeclarationsMessage")
                 : t("declarationsWillAppear")
             }
@@ -176,6 +225,7 @@ const styles = StyleSheet.create({
   },
   filterContainer: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.sm,
     marginBottom: Spacing.lg,
   },
@@ -188,5 +238,10 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 13,
     fontWeight: "500",
+  },
+  resultText: {
+    fontSize: 12,
+    marginBottom: Spacing.md,
+    fontStyle: "italic",
   },
 });

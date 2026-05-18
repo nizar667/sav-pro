@@ -17,7 +17,7 @@ app.use(express.json({ limit: '10mb' }));
 // CORS
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.sendStatus(200);
   next();
@@ -569,6 +569,9 @@ app.get("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
         completed_at,
         completed_by,
         commercial_id,
+        glass_broken,
+        glass_size,
+        glass_supplier,
         client:clients!declarations_client_id_fkey(id, name, email, phone, address),
         category:categories(id, name),
         commercial:users!declarations_commercial_id_fkey(id, name, email, role),
@@ -598,6 +601,7 @@ app.get("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
     });
   }
 });
+
 app.get("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -623,6 +627,9 @@ app.get("/api/declarations/:id", authMiddleware, async (req: AuthRequest, res) =
         completed_at,
         completed_by,
         commercial_id,
+        glass_broken,
+        glass_size,
+        glass_supplier,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
         commercial:users!declarations_commercial_id_fkey(id, name, email, role),
@@ -703,6 +710,9 @@ app.post("/api/declarations", authMiddleware, async (req: AuthRequest, res) => {
         completed_at,
         completed_by,
         commercial_id,
+        glass_broken,
+        glass_size,
+        glass_supplier,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
         commercial:users!declarations_commercial_id_fkey(id, name, email)
@@ -859,6 +869,9 @@ app.post("/api/declarations/:id/take", authMiddleware, async (req: AuthRequest, 
         completed_at,
         completed_by,
         commercial_id,
+        glass_broken,
+        glass_size,
+        glass_supplier,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
         commercial:users!declarations_commercial_id_fkey(id, name, email),
@@ -931,6 +944,9 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
         completed_at,
         completed_by,
         commercial_id,
+        glass_broken,
+        glass_size,
+        glass_supplier,
         client:clients(id, name, email, phone, address),
         category:categories(id, name),
         commercial:users!declarations_commercial_id_fkey(id, name, email),
@@ -1038,6 +1054,95 @@ app.patch("/api/declarations/:id/remarks", authMiddleware, async (req: AuthReque
   } catch (error) {
     console.error("Update remarks error:", error);
     res.status(500).json({ message: "Erreur mise à jour remarques" });
+  }
+});
+
+// ================ DIAGNOSTIC VERRE ================
+app.patch("/api/declarations/:id/glass", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { glass_broken, glass_size, glass_supplier } = req.body;
+    const user_id = req.user?.id;
+    
+    if (!user_id) {
+      return res.status(401).json({ message: "Non authentifié" });
+    }
+
+    // Vérifier que le technicien est bien assigné à cette déclaration
+    const { data: declaration, error: checkError } = await supabase
+      .from("declarations")
+      .select("technician_id, status")
+      .eq("id", id)
+      .single();
+
+    if (checkError || !declaration) {
+      return res.status(404).json({ message: "Déclaration non trouvée" });
+    }
+
+    if (declaration.technician_id !== user_id) {
+      return res.status(403).json({ message: "Vous n'êtes pas le technicien assigné" });
+    }
+
+    // Mise à jour des infos verre
+    const { data, error } = await supabase
+      .from("declarations")
+      .update({
+        glass_broken: glass_broken || false,
+        glass_size: glass_size || null,
+        glass_supplier: glass_supplier || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ 
+      success: true, 
+      message: "Diagnostic verre enregistré",
+      data 
+    });
+  } catch (error) {
+    console.error("Glass diagnostic error:", error);
+    res.status(500).json({ message: "Erreur lors de l'enregistrement" });
+  }
+});
+
+// ================ STATISTIQUES VERRE (pour tableau de bord) ================
+app.get("/api/glass-stats", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const user_id = req.user?.id;
+    
+    if (!user_id) {
+      return res.status(401).json({ message: "Non authentifié" });
+    }
+
+    // Seuls les techniciens peuvent voir ces stats
+    if (req.user?.role !== "technicien") {
+      return res.status(403).json({ message: "Accès réservé aux techniciens" });
+    }
+
+    const { data, error } = await supabase
+      .from("declarations")
+      .select(`
+        glass_broken,
+        glass_size,
+        glass_supplier,
+        category:categories(name)
+      `)
+      .eq("glass_broken", true)
+      .not("glass_size", "is", null)
+      .not("glass_supplier", "is", null);
+
+    if (error) throw error;
+
+    // Filtrer uniquement les TV (catégorie "Télévision")
+    const tvData = data?.filter(item => item.category?.name === "Télévision") || [];
+
+    res.json(tvData);
+  } catch (error) {
+    console.error("Glass stats error:", error);
+    res.status(500).json({ message: "Erreur récupération statistiques" });
   }
 });
 

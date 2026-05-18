@@ -1,10 +1,37 @@
 {
-  "android": {
-    "package": "com.nizarkroim.savproclient"
-  },
-  "extra": {
-    "eas": {
-      "projectId": "fd703b98-dd9e-427a-aa5a-b1488d9e0781"
+  "expo": {
+    "name": "SAV",
+    "slug": "sav",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nizarkroim.sav"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.nizarkroim.savproclient"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fd703b98-dd9e-427a-aa5a-b1488d9e0781"
+      }
     }
   }
 }

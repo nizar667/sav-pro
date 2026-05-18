@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { View, StyleSheet, Image, Pressable, Alert, Platform, TextInput, ScrollView, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -73,200 +73,39 @@ export default function NewDeclarationScreen() {
   const isValid =
     categoryId && productName.trim() && reference.trim() && serialNumber.trim() && clientId;
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <HeaderButton onPress={() => navigation.goBack()}>
-          <ThemedText style={{ color: theme.primary }}>{t("cancel")}</ThemedText>
-        </HeaderButton>
-      ),
-      headerRight: () => (
-        <HeaderButton onPress={handleSubmit} disabled={!isValid || isLoading}>
-          <ThemedText
-            style={{
-              color: isValid && !isLoading ? theme.primary : theme.textSecondary,
-              fontWeight: "600",
-            }}
-          >
-            {isLoading ? "..." : t("create")}
-          </ThemedText>
-        </HeaderButton>
-      ),
-      headerTitle: t("newDeclaration"),
-    });
-  }, [navigation, theme, isValid, isLoading, t]);
-
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        t("permissionRequired"),
-        t("galleryPermissionMessage")
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setPhotoUri(result.assets[0].uri);
-    }
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        t("permissionRequired"),
-        t("cameraPermissionMessage")
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setPhotoUri(result.assets[0].uri);
-    }
-  };
-
-  const handlePhotoPress = () => {
-    if (Platform.OS === "web") {
-      pickImage();
-      return;
-    }
-
-    Alert.alert(t("addPhoto"), t("howToAddPhoto"), [
-      { text: t("cancel"), style: "cancel" },
-      { text: t("gallery"), onPress: pickImage },
-      { text: t("camera"), onPress: takePhoto },
-    ]);
-  };
-
-  const toggleAccessory = (id: string) => {
-    setAccessories((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, checked: !item.checked } : item
-      )
-    );
-  };
-
-  const addCustomAccessory = () => {
-    if (!customAccessory.trim()) return;
-    
-    const newAccessory: AccessoryItem = {
-      id: String(Date.now()),
-      name: customAccessory.trim(),
-      checked: true,
-    };
-    
-    setAccessories((prev) => [...prev, newAccessory]);
-    setCustomAccessory("");
-  };
-
-  const removeAccessory = (id: string) => {
-    setAccessories((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!categoryId) newErrors.category = t("fieldRequired");
-    if (!productName.trim()) newErrors.productName = t("fieldRequired");
-    if (!reference.trim()) newErrors.reference = t("fieldRequired");
-    if (!serialNumber.trim()) newErrors.serialNumber = t("fieldRequired");
-    if (!clientId) newErrors.client = t("fieldRequired");
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // SOLUTION CRITIQUE : Utiliser onChange au lieu de onChangeText
-  const handleSerialNumberChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-    const text = e.nativeEvent.text;
-    console.log("🔍 SerialNumber (onChange):", text, "length:", text.length);
-    setSerialNumber(text);
-    serialNumberRef.current = text;
-  };
-
-  const handleDescriptionChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-    const text = e.nativeEvent.text;
-    console.log("🔍 Description (onChange):", text, "length:", text.length);
-    setDescription(text);
-    descriptionRef.current = text;
-  };
-
-  const handleProductNameChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-    const text = e.nativeEvent.text;
-    setProductName(text);
-    productNameRef.current = text;
-  };
-
-  const handleReferenceChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-    const text = e.nativeEvent.text;
-    setReference(text);
-    referenceRef.current = text;
-  };
-
-  const handleSubmit = async () => {
-    console.log("🔄 SUBMIT - Valeurs FINALES:");
-    console.log("serialNumber (state):", serialNumber);
-    console.log("serialNumber (ref):", serialNumberRef.current);
-    console.log("description (state):", description);
-    console.log("description (ref):", descriptionRef.current);
+  // === CORRECTION 1 : useCallback + envoi de TOUS les accessoires ===
+  const handleSubmit = useCallback(async () => {
+    console.log("🔄 SUBMIT - Accessoires :", accessories);
     
     if (!validate()) return;
 
-    // Utiliser la valeur du ref (toujours complète)
     const finalSerialNumber = serialNumberRef.current || serialNumber;
     const finalDescription = descriptionRef.current || description;
     const finalProductName = productNameRef.current || productName;
     const finalReference = referenceRef.current || reference;
 
-    console.log("🎯 Valeurs utilisées pour l'envoi:");
-    console.log("serial_number:", finalSerialNumber);
-    console.log("description:", finalDescription);
-
     setIsLoading(true);
     try {
       const baseUrl = getApiUrl();
-      
       let photoUrl = null;
       if (photoUri) {
         const formData = new FormData();
         const filename = photoUri.split("/").pop() || "photo.jpg";
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : "image/jpeg";
-        
-        formData.append("photo", {
-          uri: photoUri,
-          name: filename,
-          type,
-        } as any);
-
+        formData.append("photo", { uri: photoUri, name: filename, type } as any);
         const uploadResponse = await fetch(new URL("/api/upload", baseUrl).href, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: formData,
         });
-
         if (uploadResponse.ok) {
           const uploadData = await uploadResponse.json();
           photoUrl = uploadData.url;
         }
       }
 
-      const checkedAccessories = accessories.filter((a) => a.checked);
-
+      // Envoi de TOUS les accessoires (pas seulement les cochés)
       const requestData = {
         category_id: categoryId,
         client_id: clientId,
@@ -275,7 +114,7 @@ export default function NewDeclarationScreen() {
         serial_number: finalSerialNumber.trim(),
         description: finalDescription.trim(),
         photo_url: photoUrl,
-        accessories: checkedAccessories,
+        accessories: accessories, // ← Correction ici
       };
 
       console.log("📤 Envoi au backend:", JSON.stringify(requestData, null, 2));
@@ -302,6 +141,132 @@ export default function NewDeclarationScreen() {
     } finally {
       setIsLoading(false);
     }
+  }, [categoryId, clientId, productName, reference, serialNumber, description, photoUri, accessories, token, t, navigation, isValid]);
+
+  // === CORRECTION 2 : Ajouter handleSubmit dans les dépendances ===
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <HeaderButton onPress={() => navigation.goBack()}>
+          <ThemedText style={{ color: theme.primary }}>{t("cancel")}</ThemedText>
+        </HeaderButton>
+      ),
+      headerRight: () => (
+        <HeaderButton onPress={handleSubmit} disabled={!isValid || isLoading}>
+          <ThemedText
+            style={{
+              color: isValid && !isLoading ? theme.primary : theme.textSecondary,
+              fontWeight: "600",
+            }}
+          >
+            {isLoading ? "..." : t("create")}
+          </ThemedText>
+        </HeaderButton>
+      ),
+      headerTitle: t("newDeclaration"),
+    });
+  }, [navigation, theme, isValid, isLoading, t, handleSubmit]); // handleSubmit ajouté
+
+  // === Le reste des fonctions (inchangées) ===
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(t("permissionRequired"), t("galleryPermissionMessage"));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (!result.canceled) setPhotoUri(result.assets[0].uri);
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(t("permissionRequired"), t("cameraPermissionMessage"));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (!result.canceled) setPhotoUri(result.assets[0].uri);
+  };
+
+  const handlePhotoPress = () => {
+    if (Platform.OS === "web") {
+      pickImage();
+      return;
+    }
+    Alert.alert(t("addPhoto"), t("howToAddPhoto"), [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("gallery"), onPress: pickImage },
+      { text: t("camera"), onPress: takePhoto },
+    ]);
+  };
+
+  const toggleAccessory = (id: string) => {
+    setAccessories((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, checked: !item.checked } : item
+      )
+    );
+  };
+
+  const addCustomAccessory = () => {
+    if (!customAccessory.trim()) return;
+    const newAccessory: AccessoryItem = {
+      id: String(Date.now()),
+      name: customAccessory.trim(),
+      checked: true,
+    };
+    setAccessories((prev) => [...prev, newAccessory]);
+    setCustomAccessory("");
+  };
+
+  const removeAccessory = (id: string) => {
+    setAccessories((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!categoryId) newErrors.category = t("fieldRequired");
+    if (!productName.trim()) newErrors.productName = t("fieldRequired");
+    if (!reference.trim()) newErrors.reference = t("fieldRequired");
+    if (!serialNumber.trim()) newErrors.serialNumber = t("fieldRequired");
+    if (!clientId) newErrors.client = t("fieldRequired");
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSerialNumberChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const text = e.nativeEvent.text;
+    console.log("🔍 SerialNumber (onChange):", text);
+    setSerialNumber(text);
+    serialNumberRef.current = text;
+  };
+
+  const handleDescriptionChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const text = e.nativeEvent.text;
+    console.log("🔍 Description (onChange):", text);
+    setDescription(text);
+    descriptionRef.current = text;
+  };
+
+  const handleProductNameChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const text = e.nativeEvent.text;
+    setProductName(text);
+    productNameRef.current = text;
+  };
+
+  const handleReferenceChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const text = e.nativeEvent.text;
+    setReference(text);
+    referenceRef.current = text;
   };
 
   const clientOptions = clients.map((c) => ({ id: c.id, name: c.name }));
@@ -321,10 +286,7 @@ export default function NewDeclarationScreen() {
         label={`${t("category")} *`}
         placeholder={t("selectCategory")}
         value={categoryId}
-        options={CATEGORIES.map(cat => ({
-          id: cat.id,
-          name: cat.name
-        }))}
+        options={CATEGORIES.map(cat => ({ id: cat.id, name: cat.name }))}
         onSelect={(opt) => setCategoryId(opt.id)}
         error={errors.category}
       />
@@ -338,7 +300,7 @@ export default function NewDeclarationScreen() {
         error={errors.client}
       />
 
-      {/* PRODUCT NAME - CORRIGÉ */}
+      {/* PRODUCT NAME */}
       <View style={styles.fieldContainer}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
           {t("productName")} *
@@ -363,7 +325,7 @@ export default function NewDeclarationScreen() {
         )}
       </View>
 
-      {/* REFERENCE - CORRIGÉ */}
+      {/* REFERENCE */}
       <View style={styles.fieldContainer}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
           {t("reference")} *
@@ -389,7 +351,7 @@ export default function NewDeclarationScreen() {
         )}
       </View>
 
-      {/* SERIAL NUMBER - CORRIGÉ (SOLUTION) */}
+      {/* SERIAL NUMBER */}
       <View style={styles.fieldContainer}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
           {t("serialNumber")} *
@@ -405,7 +367,7 @@ export default function NewDeclarationScreen() {
           ]}
           placeholder={t("serialNumber")}
           value={serialNumber}
-          onChange={handleSerialNumberChange} // ← CHANGÉ ICI
+          onChange={handleSerialNumberChange}
           autoCapitalize="characters"
         />
         {errors.serialNumber && (
@@ -415,7 +377,7 @@ export default function NewDeclarationScreen() {
         )}
       </View>
 
-      {/* DESCRIPTION - CORRIGÉ (SOLUTION) */}
+      {/* DESCRIPTION */}
       <View style={styles.fieldContainer}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
           {t("problemDescription")}
@@ -431,7 +393,7 @@ export default function NewDeclarationScreen() {
           ]}
           placeholder={t("problemDescription")}
           value={description}
-          onChange={handleDescriptionChange} // ← CHANGÉ ICI
+          onChange={handleDescriptionChange}
           multiline
           numberOfLines={6}
           textAlignVertical="top"
@@ -449,10 +411,7 @@ export default function NewDeclarationScreen() {
         <View style={[styles.accessoriesList, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
           {accessories.map((item) => (
             <View key={item.id} style={styles.accessoryRow}>
-              <Pressable
-                style={styles.checkboxRow}
-                onPress={() => toggleAccessory(item.id)}
-              >
+              <Pressable style={styles.checkboxRow} onPress={() => toggleAccessory(item.id)}>
                 <Checkbox
                   value={item.checked}
                   onValueChange={() => toggleAccessory(item.id)}
@@ -534,115 +493,27 @@ export default function NewDeclarationScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: Spacing.xl,
-  },
-  fieldContainer: {
-    marginBottom: Spacing.lg,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: Spacing.sm,
-  },
-  input: {
-    height: Spacing.inputHeight,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.lg,
-    fontSize: 16,
-    borderWidth: 1,
-  },
-  textArea: {
-    minHeight: 120,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    fontSize: 16,
-    borderWidth: 1,
-    textAlignVertical: 'top',
-  },
-  error: {
-    fontSize: 12,
-    marginTop: Spacing.xs,
-  },
-  hint: {
-    fontSize: 12,
-    marginBottom: Spacing.md,
-  },
-  accessoriesSection: {
-    marginBottom: Spacing.lg,
-  },
-  accessoriesList: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    padding: Spacing.md,
-    gap: Spacing.sm,
-  },
-  accessoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  checkbox: {
-    marginRight: Spacing.md,
-    width: 22,
-    height: 22,
-    borderRadius: 4,
-  },
-  accessoryText: {
-    fontSize: 15,
-    flex: 1,
-  },
-  addAccessoryRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  addAccessoryInput: {
-    flex: 1,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.md,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: Spacing.lg,
-  },
-  photoSection: {
-    marginBottom: Spacing.lg,
-  },
-  photoButton: {
-    height: 160,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    overflow: "hidden",
-  },
-  photoPlaceholder: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  photoText: {
-    marginTop: Spacing.sm,
-    fontSize: 14,
-  },
-  photoPreview: {
-    width: "100%",
-    height: "100%",
-  },
-  removePhoto: {
-    marginTop: Spacing.sm,
-    alignSelf: "center",
-  },
+  container: { flex: 1 },
+  content: { paddingHorizontal: Spacing.xl },
+  fieldContainer: { marginBottom: Spacing.lg },
+  label: { fontSize: 14, fontWeight: "500", marginBottom: Spacing.sm },
+  input: { height: Spacing.inputHeight, borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.lg, fontSize: 16, borderWidth: 1 },
+  textArea: { minHeight: 120, borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, fontSize: 16, borderWidth: 1, textAlignVertical: "top" },
+  error: { fontSize: 12, marginTop: Spacing.xs },
+  hint: { fontSize: 12, marginBottom: Spacing.md },
+  accessoriesSection: { marginBottom: Spacing.lg },
+  accessoriesList: { borderRadius: BorderRadius.md, borderWidth: 1, padding: Spacing.md, gap: Spacing.sm },
+  accessoryRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  checkboxRow: { flexDirection: "row", alignItems: "center", flex: 1 },
+  checkbox: { marginRight: Spacing.md, width: 22, height: 22, borderRadius: 4 },
+  accessoryText: { fontSize: 15, flex: 1 },
+  addAccessoryRow: { flexDirection: "row", alignItems: "flex-end", gap: Spacing.sm, marginTop: Spacing.md },
+  addAccessoryInput: { flex: 1 },
+  addButton: { width: 44, height: 44, borderRadius: BorderRadius.md, justifyContent: "center", alignItems: "center", marginBottom: Spacing.lg },
+  photoSection: { marginBottom: Spacing.lg },
+  photoButton: { height: 160, borderRadius: BorderRadius.md, borderWidth: 1, borderStyle: "dashed", overflow: "hidden" },
+  photoPlaceholder: { flex: 1, justifyContent: "center", alignItems: "center" },
+  photoText: { marginTop: Spacing.sm, fontSize: 14 },
+  photoPreview: { width: "100%", height: "100%" },
+  removePhoto: { marginTop: Spacing.sm, alignSelf: "center" },
 });

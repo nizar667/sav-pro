@@ -34,6 +34,12 @@ export function StatusBadge({ status, size = "medium" }: StatusBadgeProps) {
           backgroundColor: theme.success + "20",
           text: t("resolved")
         };
+      case "sortie":
+        return {
+          color: "#9C27B0", // Violet
+          backgroundColor: "#9C27B0" + "20",
+          text: "Sortie" // À ajouter dans les traductions si besoin
+        };
       default:
         return {
           color: theme.textSecondary,

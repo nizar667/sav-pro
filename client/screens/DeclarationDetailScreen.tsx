@@ -53,10 +53,11 @@ export default function DeclarationDetailScreen() {
   const [exitName, setExitName] = useState("");
 
   useEffect(() => {
+    console.log("📱 Route params:", route.params);
     if (!route.params?.declaration && token) {
       const declarationId = (route.params as any)?.declarationId || 
                            (route.params?.declaration as any)?.id;
-      
+      console.log("🔍 declarationId trouvé:", declarationId);
       if (declarationId) {
         fetchDeclaration(declarationId);
       } else {
@@ -178,52 +179,190 @@ export default function DeclarationDetailScreen() {
   };
 
   const handleResolve = async () => {
-  if (!declaration || !token) return;
+    if (!declaration || !token) return;
 
-  Alert.alert(
-    t("confirm"),
-    t("confirmResolve"),
-    [
-      { text: t("cancel"), style: "cancel" },
-      {
-        text: t("confirm"),
-        onPress: async () => {
-          setIsLoading(true);
-          try {
-            const baseUrl = getApiUrl();
-            const response = await fetch(
-              new URL(`/api/declarations/${declaration.id}/resolve`, baseUrl).href,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                // ✅ Envoie la remarque existante pour la conserver
-                body: JSON.stringify({ remarks: declaration.technician_remarks }),
+    Alert.alert(
+      t("confirm"),
+      t("confirmResolve"),
+      [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("confirm"),
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              const baseUrl = getApiUrl();
+              const response = await fetch(
+                new URL(`/api/declarations/${declaration.id}/resolve`, baseUrl).href,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ remarks: declaration.technician_remarks }),
+                }
+              );
+
+              if (response.ok) {
+                const updatedDeclaration = await response.json();
+                setDeclaration(updatedDeclaration);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert(t("success"), t("declarationResolved"));
+              } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || t("resolveFailed"));
               }
-            );
-
-            if (response.ok) {
-              const updatedDeclaration = await response.json();
-              setDeclaration(updatedDeclaration);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert(t("success"), t("declarationResolved"));
-            } else {
-              const errorData = await response.json();
-              throw new Error(errorData.message || t("resolveFailed"));
+            } catch (error: any) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert(t("error"), error.message);
+            } finally {
+              setIsLoading(false);
             }
-          } catch (error: any) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert(t("error"), error.message);
-          } finally {
-            setIsLoading(false);
-          }
+          },
         },
-      },
-    ]
-  );
-};
+      ]
+    );
+  };
+
+  // CORRECTION : Le bouton "Sortie" ouvre le modal de saisie du nom
+  const handleComplete = () => {
+    if (!declaration || !token) return;
+    setShowNameInput(true);
+  };
+
+  const submitComplete = async () => {
+    if (!exitName.trim()) {
+      Alert.alert("Erreur", "Veuillez entrer un nom");
+      return;
+    }
+
+    setShowNameInput(false);
+    setIsLoading(true);
+    
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(
+        new URL(`/api/declarations/${declaration?.id}/complete`, baseUrl).href,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ completed_by: exitName.trim() }),
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("❌ Réponse non-JSON:", text.substring(0, 200));
+        
+        if (response.status === 404) {
+          throw new Error("Route non trouvée sur le serveur");
+        } else {
+          throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+        }
+      }
+
+      const updatedDeclaration = await response.json();
+      setDeclaration(updatedDeclaration);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Succès", "Déclaration marquée comme sortie");
+      setExitName("");
+      
+    } catch (error: any) {
+      console.error("❌ Complete error:", error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        "Erreur", 
+        error.message || "Impossible de marquer comme sortie."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveRemarks = async () => {
+    if (!declaration || !token) return;
+    
+    setIsSavingRemarks(true);
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(
+        new URL(`/api/declarations/${declaration.id}/remarks`, baseUrl).href,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ technician_remarks: technicianRemarks }),
+        }
+      );
+
+      if (response.ok) {
+        const updatedDeclaration = await response.json();
+        setDeclaration(updatedDeclaration);
+        setIsEditingRemarks(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert("Succès", "Remarques enregistrées");
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Erreur enregistrement");
+      }
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Erreur", error.message);
+    } finally {
+      setIsSavingRemarks(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (!declaration || !token) return;
+
+    Alert.alert(
+      t("delete"),
+      t("confirmDelete"),
+      [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("delete"),
+          style: "destructive",
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              const baseUrl = getApiUrl();
+              const response = await fetch(
+                new URL(`/api/declarations/${declaration.id}`, baseUrl).href,
+                {
+                  method: "DELETE",
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+
+              if (response.ok) {
+                Haptics.notificationAsync(
+                  Haptics.NotificationFeedbackType.Success
+                );
+                Alert.alert(t("success"), t("declarationDeleted"));
+                navigation.goBack();
+              } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || t("deleteFailed"));
+              }
+            } catch (error: any) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert(t("error"), error.message);
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleGenerateTicket = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -562,7 +701,7 @@ html, body {
           </View>
         </View>
 
-        {/* SECTION ACCESSOIRES - VISIBLE POUR TOUS MAINTENANT */}
+        {/* SECTION ACCESSOIRES */}
         {declaration.accessories && declaration.accessories.length > 0 && (
           <View style={[styles.section, { backgroundColor: theme.backgroundDefault }]}>
             <View style={styles.sectionHeader}>
@@ -731,7 +870,7 @@ html, body {
               </View>
             )}
 
-            {/* Date de sortie avec le nom de la personne */}
+            {/* Date de sortie */}
             {declaration.completed_at && (
               <View style={styles.timelineItem}>
                 <View style={[styles.timelineDot, { backgroundColor: "#9C27B0" }]} />
@@ -779,7 +918,7 @@ html, body {
               </Button>
             )}
 
-            {/* Bouton Sortie avec popup */}
+            {/* Bouton Sortie - corrigé */}
             {canComplete && (
               <Button
                 onPress={handleComplete}
@@ -1009,6 +1148,7 @@ html, body {
   );
 }
 
+// Les styles restent inchangés
 const styles = StyleSheet.create({
   container: {
     flex: 1,

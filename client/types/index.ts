@@ -1,4 +1,4 @@
-// types/index.ts - CORRIGÉ
+// types/index.ts
 export type DeclarationStatus = "nouvelle" | "en_cours" | "reglee" | "sortie";
 
 export interface Category {
@@ -61,13 +61,17 @@ export interface Declaration {
   created_at: string;
   taken_at?: string;
   resolved_at?: string;
-  completed_at?: string; // NOUVEAU : date de sortie
-  completed_by?: string; // ← NOUVEAU : nom de la personne qui a sorti
+  completed_at?: string;
+  completed_by?: string;
+  // Nouveaux champs pour le diagnostic verre
+  glass_broken?: boolean;
+  glass_size?: number;
+  glass_supplier?: string;
 }
 
-// NOUVELLES CATÉGORIES - CORRESPONDANT À VOTRE SUPABASE
+// Catégories
 export const CATEGORIES: Category[] = [
-   { id: "1", name: "Accessoires TV" },
+  { id: "1", name: "Accessoires TV" },
   { id: "2", name: "Audio & Son" },
   { id: "3", name: "Caméra de surveillance" },
   { id: "4", name: "Climat" },
@@ -88,3 +92,9 @@ export const DEFAULT_ACCESSORIES: string[] = [
   "Accessoires d'origine",
   "Garantie",
 ];
+
+// Liste des fournisseurs pour le diagnostic verre
+export const GLASS_SUPPLIERS: string[] = ["TONY", "CINDY", "OWEN"];
+
+// Tailles disponibles pour le diagnostic verre
+export const GLASS_SIZES: number[] = [24, 32, 40, 43, 50, 55, 65, 75, 85, 100];

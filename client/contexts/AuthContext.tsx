@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getApiUrl } from "@/lib/query-client";
 
 export type UserRole = "commercial" | "technicien";
 
@@ -31,6 +32,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ✅ Charge la session au démarrage
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
+        const storedUser = await AsyncStorage.getItem(USER_KEY);
+
+        if (storedToken && storedUser) {
+          console.log("✅ Session restaurée automatiquement");
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+        } else {
+          console.log("ℹ️ Aucune session existante");
+        }
+      } catch (error) {
+        console.error("❌ Erreur lors du chargement de la session:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSession();
+  }, []);
+
   const clearOldToken = async () => {
     try {
       await AsyncStorage.removeItem(TOKEN_KEY);
@@ -43,35 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    clearOldToken().then(() => {
-      loadStoredAuth();
-    });
-  }, []);
-
-  async function loadStoredAuth() {
-    try {
-      const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
-      const storedUser = await AsyncStorage.getItem(USER_KEY);
-
-      if (storedToken && storedUser) {
-        console.log("📱 Token chargé depuis storage:", storedToken.substring(0, 30) + "...");
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } else {
-        console.log("📱 Aucun token trouvé dans le storage");
-      }
-    } catch (error) {
-      console.error("Failed to load auth:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
   async function login(email: string, password: string) {
     try {
-      const baseUrl = "http://192.168.1.87:8080";
-      console.log("🔐 Tentative de connexion pour:", email);
+      const baseUrl = getApiUrl();
+      console.log("🔐 Tentative de connexion vers:", baseUrl);
       
       const response = await fetch(new URL("/api/auth/login", baseUrl).href, {
         method: "POST",
@@ -124,7 +124,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function register(email: string, password: string, name: string, role: UserRole) {
     try {
-      const baseUrl = "http://192.168.1.87:8080";
+      const baseUrl = getApiUrl();
+      console.log("📝 Tentative d'inscription vers:", baseUrl);
+      
       const response = await fetch(new URL("/api/auth/register", baseUrl).href, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       
     } catch (error: any) {
-      console.error("Register error:", error);
+      console.error("❌ Register error:", error);
       
       let userMessage = "Erreur lors de l'inscription";
       if (error.message && error.message.includes("Network")) {

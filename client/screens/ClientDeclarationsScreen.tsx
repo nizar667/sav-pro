@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { View, FlatList, StyleSheet } from "react-native";
+import { View, FlatList, StyleSheet, Alert, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { ThemedText } from "@/components/ThemedText";
-import { DeclarationCard } from "@/components/DeclarationCard";
+import { StatusBadge } from "@/components/StatusBadge";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { Spacing } from "@/constants/theme";
+import { Spacing, BorderRadius } from "@/constants/theme";
 import { Declaration } from "@/types";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -21,12 +20,22 @@ export default function ClientDeclarationsScreen() {
   const { token } = useAuth();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
-  const params = route.params as { clientId: string; clientName: string };
+
+  // Sécuriser la récupération des paramètres
+  const params = route.params as { clientId?: string; clientName?: string } | undefined;
+  const clientId = params?.clientId ?? "";
+  const clientName = params?.clientName ?? "?";
+
   const [declarations, setDeclarations] = useState<Declaration[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!clientId) {
+      Alert.alert("Erreur", "Client non trouvé");
+      setLoading(false);
+      return;
+    }
+
     const fetchDeclarations = async () => {
       try {
         const baseUrl = getApiUrl();
@@ -34,16 +43,28 @@ export default function ClientDeclarationsScreen() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();
-        const filtered = data.filter((d: Declaration) => d.client_id === params.clientId);
+        const filtered = data.filter((d: Declaration) => d.client_id === clientId);
         setDeclarations(filtered);
       } catch (error) {
         console.error("Erreur chargement déclarations:", error);
+        Alert.alert("Erreur", "Impossible de charger les déclarations");
       } finally {
         setLoading(false);
       }
     };
+
     fetchDeclarations();
-  }, [params.clientId, token]);
+  }, [clientId, token]);
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "—";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "—";
+    return date.toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "short",
+    });
+  };
 
   if (loading) {
     return (
@@ -60,22 +81,37 @@ export default function ClientDeclarationsScreen() {
           styles.listContent,
           {
             paddingTop: headerHeight + Spacing.lg,
-            paddingBottom: tabBarHeight + Spacing.xl,
+            paddingBottom: insets.bottom + Spacing.xl,
           },
         ]}
         data={declarations}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <DeclarationCard
-            declaration={item}
-            onPress={() => navigation.navigate("DeclarationDetail", { 
-              declarationId: item.id 
-            })}
-          />
+          <Pressable
+            style={[styles.card, { backgroundColor: theme.backgroundDefault }]}
+            onPress={() => {
+              navigation.navigate("DeclarationDetail", { 
+                declarationId: item.id 
+              });
+            }}
+          >
+            <View style={styles.cardHeader}>
+              <StatusBadge status={item.status} size="small" />
+              <ThemedText style={[styles.date, { color: theme.textSecondary }]}>
+                {formatDate(item.created_at)}
+              </ThemedText>
+            </View>
+            <ThemedText type="body" numberOfLines={1} style={styles.productName}>
+              {item.product_name}
+            </ThemedText>
+            <ThemedText style={[styles.reference, { color: theme.textSecondary }]}>
+              {item.reference}
+            </ThemedText>
+          </Pressable>
         )}
         ListHeaderComponent={
           <View style={styles.header}>
-            <ThemedText type="h3">Déclarations de {params.clientName}</ThemedText>
+            <ThemedText type="h3">Déclarations de {clientName}</ThemedText>
             <ThemedText style={[styles.count, { color: theme.textSecondary }]}>
               {declarations.length} déclaration{declarations.length > 1 ? "s" : ""}
             </ThemedText>
@@ -85,7 +121,7 @@ export default function ClientDeclarationsScreen() {
           <EmptyState
             source={require("../assets/images/icon.png")}
             title="Aucune déclaration"
-            message={`Aucune déclaration trouvée pour ${params.clientName}`}
+            message={`Aucune déclaration trouvée pour ${clientName}`}
           />
         }
       />
@@ -107,5 +143,25 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 14,
     marginTop: 4,
+  },
+  card: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.sm,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  date: {
+    fontSize: 12,
+  },
+  productName: {
+    marginBottom: Spacing.xs,
+  },
+  reference: {
+    fontSize: 12,
   },
 });

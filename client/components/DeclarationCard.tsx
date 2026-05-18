@@ -115,9 +115,9 @@ export function DeclarationCard({ declaration, onPress }: DeclarationCardProps) 
 
       {/* Ligne 3: Client */}
       <View style={styles.infoRow}>
-        <Feather name="user" size={12} color="#FFFFFF" />
+        <Feather name="user" size={12} color={theme.textSecondary} />
         <ThemedText
-          style={[styles.infoText, { color: "#FFFFFF" }]}
+          style={[styles.infoText, { color: theme.text }]}
           numberOfLines={1}
         >
           {declaration.client?.name || "Client inconnu"}
