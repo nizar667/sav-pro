@@ -1068,7 +1068,6 @@ app.patch("/api/declarations/:id/glass", authMiddleware, async (req: AuthRequest
       return res.status(401).json({ message: "Non authentifié" });
     }
 
-    // Vérifier que le technicien est bien assigné à cette déclaration
     const { data: declaration, error: checkError } = await supabase
       .from("declarations")
       .select("technician_id, status")
@@ -1083,7 +1082,6 @@ app.patch("/api/declarations/:id/glass", authMiddleware, async (req: AuthRequest
       return res.status(403).json({ message: "Vous n'êtes pas le technicien assigné" });
     }
 
-    // Mise à jour des infos verre
     const { data, error } = await supabase
       .from("declarations")
       .update({
@@ -1108,7 +1106,7 @@ app.patch("/api/declarations/:id/glass", authMiddleware, async (req: AuthRequest
   }
 });
 
-// ================ STATISTIQUES VERRE (pour tableau de bord) ================
+// ================ STATISTIQUES VERRE ================
 app.get("/api/glass-stats", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const user_id = req.user?.id;
@@ -1117,7 +1115,6 @@ app.get("/api/glass-stats", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(401).json({ message: "Non authentifié" });
     }
 
-    // Seuls les techniciens peuvent voir ces stats
     if (req.user?.role !== "technicien") {
       return res.status(403).json({ message: "Accès réservé aux techniciens" });
     }
@@ -1136,13 +1133,103 @@ app.get("/api/glass-stats", authMiddleware, async (req: AuthRequest, res) => {
 
     if (error) throw error;
 
-    // Filtrer uniquement les TV (catégorie "Télévision")
     const tvData = data?.filter(item => item.category?.name === "Télévision") || [];
 
     res.json(tvData);
   } catch (error) {
     console.error("Glass stats error:", error);
     res.status(500).json({ message: "Erreur récupération statistiques" });
+  }
+});
+
+// ================ TOGGLE ÉCRAN CASSÉ (TV only) ================
+app.patch("/api/declarations/:id/toggle-ecran-casse", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const user_id = req.user?.id;
+    if (!user_id) return res.status(401).json({ message: "Non authentifié" });
+
+    const { data: decl, error: checkError } = await supabase
+      .from("declarations")
+      .select("commercial_id, technician_id, status, category:categories(name)")
+      .eq("id", id)
+      .single();
+
+    if (checkError || !decl) return res.status(404).json({ message: "Déclaration non trouvée" });
+
+    if ((decl as any).category?.name !== "Télévision") {
+      return res.status(400).json({ message: "Réservé aux TV" });
+    }
+
+    const isOwner = decl.commercial_id === user_id;
+    const isAssignedTech = decl.technician_id === user_id;
+    if (!isOwner && !isAssignedTech && req.user?.role !== "admin") {
+      return res.status(403).json({ message: "Non autorisé" });
+    }
+
+    const newStatus = decl.status === "ecran_casse" ? "nouvelle" : "ecran_casse";
+
+    const { data, error } = await supabase
+      .from("declarations")
+      .update({ status: newStatus })
+      .eq("id", id)
+      .select(`
+        *,
+        client:clients(*),
+        category:categories(*),
+        commercial:users!declarations_commercial_id_fkey(id, name, email),
+        technician:users!declarations_technician_id_fkey(id, name, email)
+      `)
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    console.error("Toggle ecran casse error:", error);
+    res.status(500).json({ message: "Erreur mise à jour" });
+  }
+});
+
+// ================ HORS GARANTIE (technicien assigné uniquement) ================
+app.patch("/api/declarations/:id/set-hors-garantie", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const user_id = req.user?.id;
+
+    if (!user_id) return res.status(401).json({ message: "Non authentifié" });
+    if (req.user?.role !== "technicien") {
+      return res.status(403).json({ message: "Réservé aux techniciens" });
+    }
+
+    const { data: decl } = await supabase
+      .from("declarations")
+      .select("technician_id")
+      .eq("id", id)
+      .single();
+
+    if (!decl) return res.status(404).json({ message: "Déclaration non trouvée" });
+    if (decl.technician_id !== user_id) {
+      return res.status(403).json({ message: "Vous n'êtes pas le technicien assigné" });
+    }
+
+    const { data, error } = await supabase
+      .from("declarations")
+      .update({ status: "hors_garantie" })
+      .eq("id", id)
+      .select(`
+        *,
+        client:clients(*),
+        category:categories(*),
+        commercial:users!declarations_commercial_id_fkey(id, name, email),
+        technician:users!declarations_technician_id_fkey(id, name, email)
+      `)
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    console.error("Set hors garantie error:", error);
+    res.status(500).json({ message: "Erreur mise à jour" });
   }
 });
 
