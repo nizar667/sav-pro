@@ -970,6 +970,7 @@ app.post("/api/declarations/:id/resolve", authMiddleware, async (req: AuthReques
   }
 });
 
+// ⚠️ MODIFIÉ : Sortie possible depuis reglee, ecran_casse ou hors_garantie
 app.post("/api/declarations/:id/complete", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -996,7 +997,7 @@ app.post("/api/declarations/:id/complete", authMiddleware, async (req: AuthReque
       })
       .eq("id", id)
       .eq("technician_id", user_id)
-      .eq("status", "reglee")
+      .in("status", ["reglee", "ecran_casse", "hors_garantie"])
       .select(`
         *,
         client:clients(*),

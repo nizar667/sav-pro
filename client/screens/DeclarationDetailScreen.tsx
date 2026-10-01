@@ -16,7 +16,6 @@ import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
 import { ThemedText } from "@/components/ThemedText";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/Button";
@@ -52,11 +51,11 @@ export default function DeclarationDetailScreen() {
   const [showNameInput, setShowNameInput] = useState(false);
   const [exitName, setExitName] = useState("");
   
-  // États pour le diagnostic verre
   const [glassBroken, setGlassBroken] = useState(false);
   const [glassSize, setGlassSize] = useState<number | null>(null);
   const [glassSupplier, setGlassSupplier] = useState<string | null>(null);
   const [isSavingGlass, setIsSavingGlass] = useState(false);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
 
   useEffect(() => {
     if (!route.params?.declaration && token) {
@@ -75,7 +74,6 @@ export default function DeclarationDetailScreen() {
     if (declaration?.technician_remarks) {
       setTechnicianRemarks(declaration.technician_remarks);
     }
-    // Charger les données verre existantes
     if (declaration) {
       setGlassBroken(declaration.glass_broken || false);
       setGlassSize(declaration.glass_size || null);
@@ -114,24 +112,52 @@ export default function DeclarationDetailScreen() {
   const isCommercial = user?.role === "commercial";
   const isTV = declaration?.category?.name === "Télévision";
   
-  const canTakeCharge = isTechnician && declaration?.status === "nouvelle";
+  // Statuts terminaux : écran cassé ou hors garantie
+  const isTerminalStatus =
+    declaration?.status === "ecran_casse" || declaration?.status === "hors_garantie";
+
+  const canTakeCharge =
+    isTechnician && declaration?.status === "nouvelle" && !isTerminalStatus;
   const canResolve =
     isTechnician &&
     declaration?.status === "en_cours" &&
-    declaration.technician_id === user?.id;
+    declaration.technician_id === user?.id &&
+    !isTerminalStatus;
+
+  // ⚠️ MODIFIÉ : Sortie possible depuis reglee, ecran_casse ou hors_garantie
   const canComplete = 
     isTechnician &&
-    declaration?.status === "reglee" &&
-    declaration.technician_id === user?.id;
+    declaration?.technician_id === user?.id &&
+    (declaration?.status === "reglee" ||
+     declaration?.status === "ecran_casse" ||
+     declaration?.status === "hors_garantie");
+
   const canDelete =
     isCommercial &&
-    declaration?.commercial_id === user?.id &&
-    (declaration.status === "nouvelle" || 
-     declaration.status === "en_cours" || 
-     declaration.status === "reglee" ||
-     declaration.status === "sortie");
-  const canEditGlass = isTechnician && declaration?.technician_id === user?.id && 
-                       (declaration?.status === "en_cours" || declaration?.status === "reglee");
+    declaration?.commercial_id === user?.id;
+
+  // Diagnostic verre : visible si TV + (commercial créateur OU technicien assigné)
+  const canEditGlass =
+    !!declaration &&
+    (declaration.status === "nouvelle" ||
+      declaration.status === "en_cours" ||
+      declaration.status === "reglee") &&
+    ((isTechnician && declaration.technician_id === user?.id) ||
+      (isCommercial && declaration.commercial_id === user?.id));
+
+  // Toggle "Écran cassé" : TV only, commercial créateur OU technicien assigné
+  const canToggleEcranCasse =
+    isTV &&
+    !!declaration &&
+    ((isTechnician && declaration.technician_id === user?.id) ||
+      (isCommercial && declaration.commercial_id === user?.id));
+
+  // "Hors garantie" : technicien assigné UNIQUEMENT, toutes catégories, pas déjà en sortie
+  const canSetHorsGarantie =
+    isTechnician &&
+    declaration?.technician_id === user?.id &&
+    !isTerminalStatus &&
+    declaration?.status !== "sortie";
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
@@ -155,7 +181,100 @@ export default function DeclarationDetailScreen() {
     });
   };
 
-  // ========== DIAGNOSTIC VERRE ==========
+  // ================ TOGGLE ÉCRAN CASSÉ ================
+  const handleToggleEcranCasse = async () => {
+    if (!declaration || !token || isSavingStatus) return;
+    const wasChecked = declaration.status === "ecran_casse";
+
+    const doToggle = async () => {
+      setIsSavingStatus(true);
+      try {
+        const baseUrl = getApiUrl();
+        const response = await fetch(
+          new URL(`/api/declarations/${declaration.id}/toggle-ecran-casse`, baseUrl).href,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        if (!response.ok) {
+          const e = await response.json();
+          throw new Error(e.message || "Erreur");
+        }
+        const updated = await response.json();
+        setDeclaration(updated);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (e: any) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Erreur", e.message);
+      } finally {
+        setIsSavingStatus(false);
+      }
+    };
+
+    if (!wasChecked) {
+      Alert.alert(
+        "Confirmation",
+        "Marquer cette TV comme ÉCRAN CASSÉ ? Elle ne sera plus traitée.",
+        [
+          { text: "Annuler", style: "cancel" },
+          { text: "Confirmer", style: "destructive", onPress: doToggle },
+        ]
+      );
+    } else {
+      // Décocher : direct, pas de confirmation
+      doToggle();
+    }
+  };
+
+  // ================ HORS GARANTIE ================
+  const handleSetHorsGarantie = () => {
+    if (!declaration || !token || isSavingStatus) return;
+    Alert.alert(
+      "Confirmation",
+      "Marquer ce produit comme HORS GARANTIE ? Il ne sera plus traité.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Confirmer",
+          style: "destructive",
+          onPress: async () => {
+            setIsSavingStatus(true);
+            try {
+              const baseUrl = getApiUrl();
+              const response = await fetch(
+                new URL(`/api/declarations/${declaration.id}/set-hors-garantie`, baseUrl).href,
+                {
+                  method: "PATCH",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+              if (!response.ok) {
+                const e = await response.json();
+                throw new Error(e.message || "Erreur");
+              }
+              const updated = await response.json();
+              setDeclaration(updated);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (e: any) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert("Erreur", e.message);
+            } finally {
+              setIsSavingStatus(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // ================ DIAGNOSTIC VERRE ================
   const handleSaveGlassDiagnostic = async () => {
     if (!declaration || !token) return;
     
@@ -200,6 +319,7 @@ export default function DeclarationDetailScreen() {
     }
   };
 
+  // ================ TAKE CHARGE ================
   const handleTakeCharge = async () => {
     if (!declaration || !token) return;
 
@@ -235,6 +355,7 @@ export default function DeclarationDetailScreen() {
     }
   };
 
+  // ================ RESOLVE ================
   const handleResolve = async () => {
     if (!declaration || !token) return;
 
@@ -282,6 +403,7 @@ export default function DeclarationDetailScreen() {
     );
   };
 
+  // ================ COMPLETE (SORTIE) ================
   const handleComplete = () => {
     if (!declaration || !token) return;
     setShowNameInput(true);
@@ -336,6 +458,7 @@ export default function DeclarationDetailScreen() {
     }
   };
 
+  // ================ REMARQUES ================
   const handleSaveRemarks = async () => {
     if (!declaration || !token) return;
     
@@ -372,6 +495,7 @@ export default function DeclarationDetailScreen() {
     }
   };
 
+  // ================ DELETE ================
   const handleDelete = () => {
     if (!declaration || !token) return;
 
@@ -415,6 +539,7 @@ export default function DeclarationDetailScreen() {
     );
   };
 
+  // ================ TICKET ================
   const handleGenerateTicket = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowTicket(true);
@@ -432,7 +557,7 @@ export default function DeclarationDetailScreen() {
     try {
       const simplifiedID = declaration.id.substring(0, 8).toUpperCase();
       const isGlassBroken = declaration.glass_broken || glassBroken;
-      const glassIcon = isGlassBroken ? ' ⚠️📺💥 VERRE CASSÉ ⚠️' : '';
+      const glassIcon = isGlassBroken ? ' ⚠️📺💥 VERRE ⚠️' : '';
 
       const html = `
 <!DOCTYPE html>
@@ -440,96 +565,17 @@ export default function DeclarationDetailScreen() {
 <head>
 <meta charset="UTF-8">
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: white;
-}
-
-.ticket {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 10mm;
-}
-
-.id-section {
-  flex: 1.5;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  border-top: 2px solid black;
-  border-bottom: 2px solid black;
-  margin: 2mm 0;
-}
-
-.id-label {
-  font-size: 5mm;
-  font-weight: bold;
-  margin-bottom: 2mm;
-}
-
-.id-value {
-  font-size: 12mm;
-  font-weight: 900;
-  letter-spacing: 1mm;
-}
-
-.info-row {
-  flex: 0.8;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1.5px solid black;
-  padding: 2mm 0;
-  font-size: 4mm;
-  font-weight: bold;
-}
-
-.label {
-  font-weight: bold;
-}
-
-.value {
-  text-align: right;
-}
-
-.glass-warning {
-  color: red;
-  font-weight: bold;
-  background-color: #ffeeee;
-  padding: 2mm;
-  margin: 2mm 0;
-  border: 1px solid red;
-  border-radius: 2mm;
-  text-align: center;
-}
-
-.date-row {
-  flex: 0.3;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 3.5mm;
-  font-weight: bold;
-  margin-top: 2mm;
-}
-
-@page {
-  margin: 0;
-  size: auto;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background: white; }
+.ticket { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 10mm; }
+.id-section { flex: 1.5; display: flex; flex-direction: column; justify-content: center; align-items: center; border-top: 2px solid black; border-bottom: 2px solid black; margin: 2mm 0; }
+.id-label { font-size: 5mm; font-weight: bold; margin-bottom: 2mm; }
+.id-value { font-size: 12mm; font-weight: 900; letter-spacing: 1mm; }
+.info-row { flex: 0.8; display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid black; padding: 2mm 0; font-size: 4mm; font-weight: bold; }
+.label { font-weight: bold; }
+.value { text-align: right; }
+.date-row { flex: 0.3; display: flex; justify-content: center; align-items: center; font-size: 3.5mm; font-weight: bold; margin-top: 2mm; }
+@page { margin: 0; size: auto; }
 </style>
 </head>
 <body>
@@ -538,8 +584,6 @@ html, body {
     <div class="id-label">ID DÉCLARATION</div>
     <div class="id-value">${simplifiedID}</div>
   </div>
-  
-  ${isGlassBroken ? '<div class="glass-warning">⚠️ VERRE CASSÉ - TV ENDOMMAGÉE ⚠️</div>' : ''}
   
   <div class="info-row">
     <span class="label">Client</span>
@@ -613,6 +657,10 @@ html, body {
   const canEditRemarks = isTechnician && 
                         declaration?.technician_id === user?.id && 
                         (declaration?.status === "en_cours" || declaration?.status === "reglee" || declaration?.status === "sortie");
+
+  // La section Diagnostic verre reste visible pour pouvoir décocher écran cassé
+  const showGlassSection =
+    isTV && (canEditGlass || declaration.status === "ecran_casse");
 
   return (
     <>
@@ -728,14 +776,15 @@ html, body {
           )}
         </View>
 
-        {/* ========== SECTION DIAGNOSTIC VERRE (uniquement pour TV) ========== */}
-        {isTV && canEditGlass && (
+        {/* SECTION DIAGNOSTIC VERRE */}
+        {showGlassSection && (
           <View style={[styles.section, { backgroundColor: theme.backgroundDefault }]}>
             <View style={styles.sectionHeader}>
               <Feather name="alert-triangle" size={20} color={theme.warning} />
               <ThemedText type="h4">Diagnostic verre</ThemedText>
             </View>
 
+            {/* Checkbox problème verre standard */}
             <View style={styles.glassRow}>
               <Pressable 
                 style={styles.checkboxRow}
@@ -747,6 +796,35 @@ html, body {
                 <ThemedText>Problème verre constaté</ThemedText>
               </Pressable>
             </View>
+
+            {/* ⚠️ Checkbox Écran cassé (TV only) */}
+            {canToggleEcranCasse && (
+              <View style={[styles.glassRow, { marginTop: Spacing.md }]}>
+                <Pressable
+                  style={styles.checkboxRow}
+                  onPress={handleToggleEcranCasse}
+                  disabled={isSavingStatus}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      {
+                        borderColor: "#8B0000",
+                        backgroundColor:
+                          declaration.status === "ecran_casse" ? "#8B0000" : "transparent",
+                      },
+                    ]}
+                  >
+                    {declaration.status === "ecran_casse" && (
+                      <Feather name="check" size={14} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <ThemedText style={{ color: "#8B0000", fontWeight: "600" }}>
+                    Écran cassé (TV non réparable)
+                  </ThemedText>
+                </Pressable>
+              </View>
+            )}
 
             {glassBroken && (
               <>
@@ -1049,7 +1127,7 @@ html, body {
         </View>
 
         {/* SECTION ACTIONS */}
-        {(canTakeCharge || canResolve || canComplete || canDelete || isCommercial || isTechnician) && (
+        {(canTakeCharge || canResolve || canComplete || canSetHorsGarantie || canDelete || isCommercial || isTechnician) && (
           <View style={styles.actionsSection}>
             {canTakeCharge && (
               <Button
@@ -1091,6 +1169,22 @@ html, body {
                   <Feather name="check-square" size={18} color="#FFFFFF" />
                   <ThemedText style={{ color: "#FFFFFF", fontWeight: "600" }}>
                     Sortie
+                  </ThemedText>
+                </View>
+              </Button>
+            )}
+
+            {/* ⚠️ Bouton Hors garantie (bleu-gris, technicien assigné uniquement) */}
+            {canSetHorsGarantie && (
+              <Button
+                onPress={handleSetHorsGarantie}
+                disabled={isSavingStatus}
+                style={[styles.actionButton, { backgroundColor: "#455A64" }]}
+              >
+                <View style={styles.buttonInner}>
+                  <Feather name="shield-off" size={18} color="#FFFFFF" />
+                  <ThemedText style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    Marquer hors garantie
                   </ThemedText>
                 </View>
               </Button>
@@ -1362,7 +1456,6 @@ const styles = StyleSheet.create({
   actionButton: { marginTop: 0 },
   buttonInner: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
   
-  // Styles pour le diagnostic verre
   glassRow: { marginBottom: Spacing.md },
   checkboxRow: { flexDirection: "row", alignItems: "center", gap: Spacing.md },
   checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, justifyContent: "center", alignItems: "center" },
